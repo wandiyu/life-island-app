@@ -149,6 +149,12 @@
     @keyframes pop        { 0%{transform:scale(.85);opacity:0} 100%{transform:scale(1);opacity:1} }
     @keyframes shimmer    { 0%,100%{opacity:.8} 50%{opacity:1} }
     @keyframes bounce     { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+    @keyframes giftFloat  { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-8px) rotate(2deg)} }
+    @keyframes lidPop     { 0%{transform:rotate(0deg) translateY(0);opacity:1} 60%{transform:rotate(-25deg) translateY(-28px);opacity:1} 100%{transform:rotate(-30deg) translateY(-60px);opacity:0} }
+    @keyframes cardReveal { 0%{transform:scale(0.5) translateY(30px);opacity:0} 70%{transform:scale(1.05) translateY(-4px)} 100%{transform:scale(1) translateY(0);opacity:1} }
+    @keyframes confettiFall{ 0%{transform:translateY(-20px) rotate(0deg);opacity:1} 100%{transform:translateY(120px) rotate(360deg);opacity:0} }
+    @keyframes sparkle    { 0%,100%{transform:scale(0);opacity:0} 50%{transform:scale(1);opacity:1} }
+    @keyframes giftBounce { 0%,100%{transform:scale(1) rotate(-1deg)} 30%{transform:scale(1.12) rotate(2deg)} 60%{transform:scale(0.96) rotate(-1deg)} }
 
     /* scrollbar */
     ::-webkit-scrollbar { width:4px; }
@@ -177,6 +183,36 @@ const { useState, useEffect, useRef, useCallback } = React;
 const DB_KEY = "lrpg6";
 const dbGet  = () => { try { const v=localStorage.getItem(DB_KEY); return v?JSON.parse(v):null; } catch{ return null; } };
 const dbSet  = (v) => { try { localStorage.setItem(DB_KEY, JSON.stringify(v)); } catch{} };
+
+// ─── cloud sync ──────────────────────────────────────────
+let _fbUid = null; // current logged-in user's UID
+
+// Write data to localStorage cache
+const lsSet = (v) => { try { localStorage.setItem(DB_KEY, JSON.stringify(v)); } catch{} };
+
+// Load data from Firestore; returns null on failure or no data
+const fbLoad = async (uid) => {
+  try {
+    if (!uid || !window._fbDb || !window._fbDoc || !window._fbGetDoc) return null;
+    const ref = window._fbDoc(window._fbDb, "users", uid);
+    const snap = await window._fbGetDoc(ref);
+    if (snap.exists()) return snap.data();
+    return null;
+  } catch (e) {
+    console.warn("fbLoad error:", e);
+    return null;
+  }
+};
+
+// Save data to Firestore (fire-and-forget, non-blocking)
+const fbSave = (uid, data) => {
+  if (!uid || !window._fbDb || !window._fbDoc || !window._fbSetDoc) return;
+  try {
+    window._fbSetDoc(window._fbDoc(window._fbDb, "users", uid), data).catch(e => console.warn("fbSave error:", e));
+  } catch (e) {
+    console.warn("fbSave error:", e);
+  }
+};
 
 // ─── time ────────────────────────────────────────────────
 const todayKey = () => new Date().toLocaleDateString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit" });
@@ -475,7 +511,7 @@ const Leaf=({x,y,r=0,s=1,c="#7BC67E"})=>(
 );
 
 // AC-style header cloud/hill SVG
-function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear}){
+function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift}){
   const hour=new Date().getHours();
   const isNight=hour<6||hour>=20;
   const isEvening=hour>=17&&hour<20;
@@ -538,14 +574,25 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
 
       {/* content overlay */}
       <div style={{position:"relative",padding:`max(52px,env(safe-area-inset-top,52px)) 20px 0`,paddingBottom:0}}>
-        {/* gear btn */}
-        <button onClick={onGear} style={{position:"absolute",top:"max(16px,env(safe-area-inset-top,16px))",right:16,width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.55)",border:"2px solid rgba(255,255,255,.8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",backdropFilter:"blur(4px)",zIndex:5}}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#5BAF5F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-        </button>
+        {/* top-right buttons: gift (left) + gear (right) */}
+        <div style={{position:"absolute",top:"max(16px,env(safe-area-inset-top,16px))",right:16,display:"flex",gap:8,zIndex:5}}>
+          <button onClick={onGift} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.55)",border:"2px solid rgba(255,255,255,.8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",backdropFilter:"blur(4px)"}}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#5BAF5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="8" width="18" height="4" rx="1"/>
+              <rect x="5" y="12" width="14" height="9" rx="1"/>
+              <line x1="12" y1="8" x2="12" y2="21"/>
+              <path d="M12 8C12 8 9 8 9 5.5C9 4 10 3 11.5 3C13 3 12 5 12 8Z"/>
+              <path d="M12 8C12 8 15 8 15 5.5C15 4 14 3 12.5 3C11 3 12 5 12 8Z"/>
+            </svg>
+          </button>
+          <button onClick={onGear} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.55)",border:"2px solid rgba(255,255,255,.8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",backdropFilter:"blur(4px)"}}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#5BAF5F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
 
-        {/* player info */}
+        {/* player info row: left=text, right=XP ring + gift btn stacked */}
         <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:10}}>
           <div>
             <div style={{fontSize:12,color:"rgba(255,255,255,.85)",fontWeight:700,letterSpacing:1,marginBottom:2}}>
@@ -677,7 +724,7 @@ function CollapsibleRescueSection({s,save,pop}){
   return(
     <div style={{marginBottom:16,paddingBottom:16,borderBottom:"2px dashed #EDD9A3"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",userSelect:"none"}} onClick={()=>setOpen(o=>!o)}>
-        <div style={{fontSize:11,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🎲 充能抽签库</div>
+        <div style={{fontSize:11,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🎁 礼物库（充能建议）</div>
         <span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{open?"收起 ▲":"展开 ▼"}</span>
       </div>
       {open&&<div style={{marginTop:10}}>
@@ -818,10 +865,11 @@ function App(){
     const initData = async () => {
     const today=todayKey();
     let d = null;
-    // Try cloud if logged in
+    let fromCloud = false;
+    // Cloud-first: if logged in, always pull from Firestore and overwrite local
     if(user && user.uid){
       d = await fbLoad(user.uid);
-      if(d) lsSet(d); // cache locally
+      if(d){ lsSet(d); fromCloud = true; }
     }
     if(!d) d=dbGet();
     if(!d){const ns={...INIT,lastDate:today,lastResetDate:today};dbSet(ns);setS(ns);return;}
@@ -829,6 +877,7 @@ function App(){
     if(!d.checkedHabits)              d.checkedHabits={};
     if(!d.recurringQuests)            d.recurringQuests=INIT.recurringQuests;
     if(!d.rescueList)                 d.rescueList=DEF_RESCUE;
+    else{const existing=new Set(d.rescueList);const added=DEF_RESCUE.filter(x=>!existing.has(x));if(added.length)d.rescueList=[...d.rescueList,...added];}
     if(d.rescueThreshold===undefined) d.rescueThreshold=60;
     if(!d.bigEvents)                  d.bigEvents=[];
     if(!d.badges)                     d.badges=[];
@@ -875,11 +924,15 @@ function App(){
     }
 
     dbSet(d);setS(d);
+    // If data came from cloud, show a brief toast (deferred so pop() is available)
+    if(fromCloud){ setTimeout(()=>pop("☁️ 已从云端同步最新数据"),300); }
+    // If logged in but no cloud data yet (first login on this account), upload local data
+    if(user && user.uid && !fromCloud){ fbSave(user.uid, d); }
     }; // end initData
     initData();
   },[user]);
 
-  const save=useCallback(ns=>{setS(ns);dbSet(ns);},[]);
+  const save=useCallback(ns=>{setS(ns);dbSet(ns);fbSave(_fbUid,ns);},[]);
   const pop=msg=>{setToast(msg);clearTimeout(popT.current);popT.current=setTimeout(()=>setToast(null),2600);};
 
   // Auto-show weekly result popup once
@@ -991,7 +1044,7 @@ function App(){
       let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+evXp+extraFlowers,s.player.level,s.player.xpNext,s.badges);
       if(s.player.level===lv)pop("📝 大事已记录");
       else{pop(`🎉 升级 Lv.${lv}！获得徽章！`);if(latestBadge)setNewBadge(latestBadge);}
-      save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,bigEvents:[...s.bigEvents,ev].slice(-200),longStats:newLong,shortStats:applyB(s.shortStats,sc)});
+      save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,bigEvents:[...s.bigEvents,ev].slice(-2000),longStats:newLong,shortStats:applyB(s.shortStats,sc)});
     }
     setModal(null);setEvForm(null);
   };
@@ -1110,6 +1163,7 @@ function App(){
         habits={s.habits}
         th={th}
         onGear={()=>setShowSettings(true)}
+        onGift={()=>setModal("rescue")}
       />
 
       {/* tab bar */}
@@ -1132,7 +1186,7 @@ function App(){
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:22}}>🍂</span>
                 <span style={{flex:1,fontSize:13,fontWeight:700,color:"#A06000"}}>{[lowMood&&"心情",lowEnergy&&"体力"].filter(Boolean).join("、")} 偏低，需要充充电！</span>
-                <button style={{background:"#FFD166",border:"none",color:"#7A4A00",borderRadius:14,padding:"7px 16px",fontSize:12,fontWeight:900,cursor:"pointer",boxShadow:"0 2px 8px rgba(255,209,102,.5)"}} onClick={()=>setModal("rescue")}>抽签</button>
+                <button style={{background:"#FFD166",border:"none",color:"#7A4A00",borderRadius:14,padding:"7px 16px",fontSize:12,fontWeight:900,cursor:"pointer",boxShadow:"0 2px 8px rgba(255,209,102,.5)"}} onClick={()=>setModal("rescue")}>拆礼物</button>
               </div>
             </div>
           )}
@@ -1152,11 +1206,6 @@ function App(){
             </div>
             <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>点击属性 → 记录大事并调整数值</div>
           </ACCard>
-          {/* rescue quick action */}
-          <button style={{width:"100%",background:"linear-gradient(135deg,#FFF8E8,#FFF3C4)",border:"2.5px solid #FFD166",borderRadius:18,padding:"14px 10px",cursor:"pointer",boxShadow:"0 4px 14px rgba(255,209,102,.25)",textAlign:"center",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={()=>setModal("rescue")}>
-            <span style={{fontSize:22}}>🎲</span>
-            <span style={{fontSize:14,fontWeight:900,color:"#A06000"}}>充能抽签</span>
-          </button>
           {/* short stats */}
           <ACCard title="☀️ 今日状态">
             <div style={{display:"flex",gap:10}}>
@@ -1345,18 +1394,7 @@ function App(){
 
       {/* modals */}
       {modal==="rescue"&&(
-        <Drawer onClose={()=>setModal(null)}>
-          <div style={S.dH}>🎯 充能建议</div>
-          {s.rescueList.length===0?<div style={S.empty}>去「设置」添加充能建议吧</div>:(
-            <div style={{textAlign:"center",padding:"16px 0 8px"}}>
-              <button style={S.cfmBtn} onClick={()=>setDrawn(s.rescueList[Math.floor(Math.random()*s.rescueList.length)])}>🎲 {drawn?"再抽一次":"立刻抽签"}</button>
-              {drawn&&<div style={{fontSize:18,fontWeight:800,color:"#5BAF5F",marginTop:16,animation:"fadeSlideUp .3s ease"}}>✨ 建议你：{drawn}</div>}
-            </div>
-          )}
-          <div style={{textAlign:"center",marginTop:14}}>
-            <button style={{...S.dBtn,fontSize:12,padding:"8px 18px"}} onClick={()=>{setModal(null);setShowSettings(true);}}>⚙️ 编辑抽签库</button>
-          </div>
-        </Drawer>
+        <GiftModal rescueList={s.rescueList} onClose={()=>{setModal(null);setDrawn(null);}} onEditList={()=>{setModal(null);setShowSettings(true);}} drawn={drawn} setDrawn={setDrawn} s={s} save={save} pop={pop}/>
       )}
 
       {modal==="quest"&&qForm&&(
@@ -1775,6 +1813,179 @@ function BadgeCollection({badges}){
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── gift box components ─────────────────────────────────
+// 黄草绿色系 #a7c957
+const GIFT_THEMES=[
+  {bg:"#f4f9e8",border:"#a7c957",ribbon:"#7fa832",box:"#daeea3",accent:"#4e6a1a",label:"大自然的能量送给你 🌿"},
+  {bg:"#f9fce8",border:"#c2d96a",ribbon:"#a7c957",box:"#e8f5b8",accent:"#5a7a20",label:"小岛森林的礼物 🌳"},
+  {bg:"#f0f7dc",border:"#8fb840",ribbon:"#6a9428",box:"#d0e898",accent:"#3d6010",label:"清晨露珠的惊喜 🍃"},
+  {bg:"#f7faea",border:"#b8d46e",ribbon:"#90b845",box:"#deeeb8",accent:"#486018",label:"雨后清新气息 🌱"},
+  {bg:"#fafcf0",border:"#c8dc80",ribbon:"#a0bc50",box:"#e8f0c0",accent:"#607030",label:"暖阳草地的礼物 ☀️"},
+  {bg:"#eef6d8",border:"#96b848",ribbon:"#6e9030",box:"#cce088",accent:"#385810",label:"丰收时节的惊喜 🌾"},
+];
+
+const CONFETTI_COLORS=["#a7c957","#c2d96a","#7fa832","#daeea3","#4e6a1a","#e8f5b8","#8fb840","#f4f9e8"];
+
+function GiftBoxButton({onClick}){
+  const [hover,setHover]=useState(false);
+  return(
+    <button
+      onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
+      onClick={onClick}
+      style={{width:"100%",background:"linear-gradient(135deg,#f4f9e8,#eef6d8)",border:"2.5px solid #a7c957",borderRadius:20,padding:"0",cursor:"pointer",boxShadow:"0 4px 18px rgba(167,201,87,.22)",marginBottom:12,overflow:"hidden",display:"block"}}
+    >
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:14,padding:"16px 20px"}}>
+        <div style={{animation:hover?"giftBounce .5s ease infinite":"giftFloat 2.8s ease-in-out infinite",flexShrink:0}}>
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="6" y="22" width="32" height="18" rx="3" fill="#daeea3" stroke="#a7c957" strokeWidth="1.5"/>
+            <rect x="4" y="16" width="36" height="8" rx="3" fill="#a7c957" stroke="#7fa832" strokeWidth="1.5"/>
+            <rect x="19.5" y="22" width="5" height="18" fill="#7fa832" opacity="0.6"/>
+            <rect x="4" y="19" width="36" height="5" fill="#7fa832" opacity="0.6"/>
+            <ellipse cx="16" cy="16" rx="6" ry="4" fill="#a7c957" stroke="#7fa832" strokeWidth="1" transform="rotate(-20 16 16)"/>
+            <ellipse cx="28" cy="16" rx="6" ry="4" fill="#a7c957" stroke="#7fa832" strokeWidth="1" transform="rotate(20 28 16)"/>
+            <circle cx="22" cy="16" r="3.5" fill="#7fa832" stroke="#4e6a1a" strokeWidth="1"/>
+            <circle cx="36" cy="10" r="1.5" fill="#c8dc80" style={{animation:"sparkle 1.5s ease-in-out infinite"}}/>
+            <circle cx="10" cy="36" r="1" fill="#4e6a1a" style={{animation:"sparkle 1.8s ease-in-out .4s infinite"}}/>
+            <circle cx="38" cy="32" r="1.2" fill="#daeea3" style={{animation:"sparkle 2s ease-in-out .8s infinite"}}/>
+          </svg>
+        </div>
+        <div style={{textAlign:"left"}}>
+          <div style={{fontSize:15,fontWeight:900,color:"#4e6a1a",letterSpacing:.3}}>抽个充能礼物吧</div>
+          <div style={{fontSize:11,color:"#7fa832",marginTop:2,fontWeight:600}}>点击拆开，获取今日充能建议 🌿</div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function GiftModal({rescueList,onClose,onEditList,drawn,setDrawn,s,save,pop}){
+  const [phase,setPhase]=useState("idle");
+  const [theme,setTheme]=useState(GIFT_THEMES[0]);
+  const [confetti,setConfetti]=useState([]);
+
+  const openGift=()=>{
+    if(rescueList.length===0)return;
+    const t=GIFT_THEMES[Math.floor(Math.random()*GIFT_THEMES.length)];
+    setTheme(t);
+    setPhase("opening");
+    const pieces=Array.from({length:18},(_,i)=>({
+      id:i,x:20+Math.random()*60,
+      delay:Math.random()*0.5,
+      color:CONFETTI_COLORS[Math.floor(Math.random()*CONFETTI_COLORS.length)],
+      size:6+Math.random()*6,
+      rot:Math.random()*360,
+    }));
+    setConfetti(pieces);
+    setTimeout(()=>{
+      setDrawn(rescueList[Math.floor(Math.random()*rescueList.length)]);
+      setPhase("revealed");
+    },700);
+  };
+
+  const reopen=()=>{
+    setPhase("idle");
+    setDrawn(null);
+    setConfetti([]);
+    setTimeout(openGift,80);
+  };
+
+  const doIt=()=>{
+    if(s&&save){
+      const ns={...s,player:{...s.player,xp:s.player.xp+1}};
+      save(ns);
+      if(pop) pop("🌸 加油！+1 花");
+    }
+    onClose();
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(10,25,5,.5)",zIndex:100,display:"flex",alignItems:"flex-end"}} onClick={onClose}>
+      <div style={{background:"#FFFDF5",borderRadius:"24px 24px 0 0",padding:"8px 20px max(44px,env(safe-area-inset-bottom,44px))",width:"100%",maxWidth:480,margin:"0 auto",maxHeight:"88vh",overflowY:"auto",border:"2px solid #c8dc80",borderBottom:"none"}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:40,height:5,background:"#c8dc80",borderRadius:3,margin:"0 auto 20px"}}/>
+
+        {phase!=="revealed"&&(
+          <>
+            <div style={{display:"flex",justifyContent:"center",margin:"0 0 24px",position:"relative",paddingTop:40}}>
+              {confetti.map(p=>(
+                <div key={p.id} style={{position:"absolute",top:"10%",left:`${p.x}%`,width:p.size,height:p.size,background:p.color,borderRadius:p.size>9?"50%":"2px",transform:`rotate(${p.rot}deg)`,animation:`confettiFall .8s ${p.delay}s ease-out forwards`,pointerEvents:"none",zIndex:10}}/>
+              ))}
+              <button onClick={phase==="idle"?openGift:undefined} disabled={phase==="opening"} style={{background:"none",border:"none",cursor:phase==="idle"?"pointer":"default",padding:0,outline:"none"}}>
+                <div style={{animation:phase==="idle"?"giftFloat 2.5s ease-in-out infinite":phase==="opening"?"giftBounce .4s ease":undefined}}>
+                  <svg width="140" height="160" viewBox="0 0 140 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* ── 盒体 ── */}
+                    <rect x="10" y="72" width="120" height="78" rx="8" fill="#daeea3" stroke="#a7c957" strokeWidth="2.5"/>
+                    {/* 竖丝带 */}
+                    <rect x="62" y="72" width="16" height="78" fill="#7fa832" opacity="0.35" rx="3"/>
+                    {/* 横条纹 */}
+                    <rect x="10" y="108" width="120" height="14" fill="#7fa832" opacity="0.2"/>
+                    {/* 光泽 */}
+                    <ellipse cx="32" cy="90" rx="10" ry="6" fill="rgba(255,255,255,.3)" transform="rotate(-20 32 90)"/>
+
+                    {/* ── 盒盖（动画时飞走）── */}
+                    <g style={{animation:phase==="opening"?"lidPop .7s ease forwards":undefined, transformOrigin:"70px 72px"}}>
+                      <rect x="10" y="58" width="120" height="18" rx="6" fill="#a7c957" stroke="#7fa832" strokeWidth="2"/>
+                      {/* 盖上横丝带 */}
+                      <rect x="10" y="64" width="120" height="6" fill="#7fa832" opacity="0.5"/>
+                      {/* 竖丝带穿过盖 */}
+                      <rect x="62" y="58" width="16" height="18" fill="#7fa832" opacity="0.4"/>
+
+                      {/* 左翼外层 */}
+                      <path d="M67,56 C64,36 18,24 16,44 C14,64 38,78 68,62Z" fill="#7fa832" stroke="#4e6a1a" strokeWidth="1.2"/>
+                      {/* 左翼内高光 */}
+                      <path d="M66,54 C62,40 28,32 28,48 C28,60 46,70 66,58Z" fill="#c8e07a"/>
+                      {/* 右翼外层 */}
+                      <path d="M73,56 C76,36 122,24 124,44 C126,64 102,78 72,62Z" fill="#7fa832" stroke="#4e6a1a" strokeWidth="1.2"/>
+                      {/* 右翼内高光 */}
+                      <path d="M74,54 C78,40 112,32 112,48 C112,60 94,70 74,58Z" fill="#c8e07a"/>
+                      {/* 左飘带 */}
+                      <path d="M65,62 C54,76 44,88 48,98" fill="none" stroke="#4e6a1a" strokeWidth="3.5" strokeLinecap="round"/>
+                      <path d="M66,63 C58,78 52,90 56,100" fill="none" stroke="#a7c957" strokeWidth="2" strokeLinecap="round"/>
+                      {/* 右飘带 */}
+                      <path d="M75,62 C86,76 96,88 92,98" fill="none" stroke="#4e6a1a" strokeWidth="3.5" strokeLinecap="round"/>
+                      <path d="M74,63 C82,78 88,90 84,100" fill="none" stroke="#a7c957" strokeWidth="2" strokeLinecap="round"/>
+                      {/* 中心结 */}
+                      <ellipse cx="70" cy="58" rx="9" ry="8" fill="#3a5012" stroke="#2a3a08" strokeWidth="1"/>
+                      <ellipse cx="70" cy="58" rx="6" ry="5" fill="#7fa832"/>
+                      <ellipse cx="69" cy="57" rx="3" ry="2" fill="#c8e07a"/>
+                    </g>
+                  </svg>
+                </div>
+              </button>
+            </div>
+          </>
+        )}
+
+        {phase==="revealed"&&drawn&&(
+          <div style={{animation:"cardReveal .5s cubic-bezier(.34,1.56,.64,1) forwards"}}>
+            <div style={{position:"relative",height:0,overflow:"visible"}}>
+              {confetti.map(p=>(
+                <div key={p.id} style={{position:"absolute",top:0,left:`${p.x}%`,width:p.size,height:p.size,background:p.color,borderRadius:p.size>9?"50%":"2px",animation:`confettiFall 1s ${p.delay}s ease-out forwards`,pointerEvents:"none"}}/>
+              ))}
+            </div>
+            <div style={{background:theme.bg,border:`3px solid ${theme.border}`,borderRadius:24,padding:"24px 20px",textAlign:"center",marginBottom:16,boxShadow:`0 8px 28px ${theme.border}88`}}>
+              <div style={{fontSize:11,fontWeight:900,color:theme.accent,letterSpacing:1.5,marginBottom:10}}>{theme.label}</div>
+              <div style={{fontSize:52,marginBottom:14,lineHeight:1,animation:"badgePop .5s cubic-bezier(.34,1.56,.64,1)"}}>🎁</div>
+              <div style={{fontSize:20,fontWeight:900,color:"#3D2B1F",lineHeight:1.4,marginBottom:8,letterSpacing:.3}}>{drawn}</div>
+              <div style={{width:48,height:3,background:`linear-gradient(90deg,${theme.ribbon},${theme.accent})`,borderRadius:2,margin:"0 auto"}}/>
+            </div>
+            <button style={{width:"100%",background:"linear-gradient(135deg,#a7c957,#7fa832)",border:"none",color:"#fff",borderRadius:16,padding:"15px",fontSize:15,fontWeight:900,boxShadow:"0 6px 20px rgba(127,168,50,.45)",cursor:"pointer",marginBottom:10}} onClick={reopen}>
+              🎀 再拆一个
+            </button>
+            <button style={{width:"100%",background:"#f4f9e8",border:"2px solid #a7c957",color:"#4e6a1a",borderRadius:16,padding:"13px",fontSize:14,fontWeight:800,cursor:"pointer",marginBottom:10}} onClick={doIt}>
+              ✅ 就这个，去做！🌸+1
+            </button>
+          </div>
+        )}
+
+        <div style={{textAlign:"center",marginTop:8,paddingBottom:4}}>
+          <div style={{fontSize:13,fontWeight:900,color:"#4e6a1a",marginBottom:6}}>抽个充能礼物吧</div>
+          <button style={{background:"none",border:"none",color:"#B09070",fontSize:12,cursor:"pointer",padding:"6px 12px",fontFamily:"inherit"}} onClick={onEditList}>⚙️ 编辑礼物库</button>
+        </div>
+      </div>
     </div>
   );
 }
