@@ -76,14 +76,15 @@
     import { getAuth, onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-	const firebaseConfig = {
- 	 apiKey: "AIzaSyBcwkF8O1xidOk4GDrQjbTA39TXWgzuP_Q",
-  	authDomain: "life-island-c8360.firebaseapp.com",
- 	 projectId: "life-island-c8360",
-  	storageBucket: "life-island-c8360.firebasestorage.app",
-  	messagingSenderId: "584619221989",
-  	appId: "1:584619221989:web:195794361ba71241ab450c"
-	};
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBcwkF8O1xidOk4GDrQjbTA39TXWgzuP_Q",
+      authDomain: "life-island-c8360.firebaseapp.com",
+      projectId: "life-island-c8360",
+      storageBucket: "life-island-c8360.firebasestorage.app",
+      messagingSenderId: "584619221989",
+      appId: "1:584619221989:web:195794361ba71241ab450c"
+    };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -102,7 +103,7 @@
     window._fbGetDoc = getDoc;
     window._fbSetDoc = setDoc;
     window.dispatchEvent(new Event("firebase-ready"));
-  <\/script>
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet"/>
@@ -298,12 +299,13 @@ const DEF_HABITS=[
   {id:"sleep",   label:"早睡",icon:"🌙",weeklyBonus:{stats:["health"]},weeklyTarget:6,shortBonus:{energy:20,mood:10}},
   {id:"exercise",label:"运动",icon:"🏃",weeklyBonus:{stats:["health"]},weeklyTarget:3,shortBonus:{energy:18,mood:8}},
   {id:"reading", label:"读书",icon:"📖",weeklyBonus:{stats:["growth"]},weeklyTarget:7,shortBonus:{mood:12}},
-  {id:"meditate",label:"冥想",icon:"🧘",weeklyBonus:{stats:[]},        weeklyTarget:6,shortBonus:{mood:15,energy:6}},
+  {id:"meditate",label:"冥想",icon:"🧘",weeklyBonus:{stats:["health"]},weeklyTarget:6,shortBonus:{mood:15,energy:6}},
   {id:"outdoor", label:"户外",icon:"🌿",weeklyBonus:{stats:["health"]},weeklyTarget:5,shortBonus:{mood:12,energy:8}},
   {id:"writing", label:"写作",icon:"✍️",weeklyBonus:{stats:["growth"]},weeklyTarget:3,shortBonus:{mood:9}},
   {id:"focus",   label:"专注",icon:"🎯",weeklyBonus:{stats:["growth"]},weeklyTarget:4,shortBonus:{mood:5}},
 ];
-const DEF_RESCUE=["去运动一下","弹尤克里里","冥想10分钟","出门散散步","喝杯热茶"];
+const DEF_RESCUE=["去运动一下","弹尤克里里","冥想10分钟","出门散散步","喝杯热茶","写写画画","瑜伽","box呼吸法",
+"按摩手指","整理桌子","整理文件夹","闭上眼睛听音乐","看看周围环境","躺五分钟","手表reflect","手表呼吸训练","闭上眼睛摸周围的东西"];
 
 const INIT={
   player:        {name:"旅行者",level:1,xp:0,xpNext:100},
@@ -589,6 +591,109 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
           <span style={{fontSize:11,color:"rgba(255,255,255,.85)",fontWeight:700,marginLeft:2}}>{doneCnt}/{totalHabits}</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── SettingsLoginSection ─────────────────────────────────
+function SettingsLoginSection({user,setUser,setS,setShowSettings,pop}){
+  const [mode,setMode]=useState("idle"); // idle|login|register
+  const [email,setEmail]=useState("");
+  const [pass,setPass]=useState("");
+  const [err,setErr]=useState("");
+  const [loading,setLoading]=useState(false);
+
+  const reset=()=>{setMode("idle");setEmail("");setPass("");setErr("");};
+
+  const doGoogle=async()=>{
+    setLoading(true);setErr("");
+    try{
+      const r=await window._fbSignInWithPopup(window._fbAuth,window._fbGoogleProvider);
+      _fbUid=r.user.uid;setUser(r.user);pop("🎉 Google 登录成功！");reset();
+    }catch(e){setErr(e.message);}
+    setLoading(false);
+  };
+  const doEmail=async(isReg)=>{
+    if(!email||!pass){setErr("请填写邮箱和密码");return;}
+    setLoading(true);setErr("");
+    try{
+      const fn=isReg?window._fbCreateUser:window._fbSignInWithEmail;
+      const r=await fn(window._fbAuth,email,pass);
+      _fbUid=r.user.uid;setUser(r.user);pop(isReg?"🎉 注册成功！":"☁️ 已登录云端");reset();
+    }catch(e){
+      const msg=e.code==="auth/user-not-found"?"账号不存在":e.code==="auth/wrong-password"?"密码错误":e.code==="auth/email-already-in-use"?"邮箱已注册":e.code==="auth/invalid-email"?"邮箱格式不对":e.message;
+      setErr(msg);
+    }
+    setLoading(false);
+  };
+  const doSignOut=async()=>{
+    await window._fbSignOut(window._fbAuth);
+    _fbUid=null;setUser(null);setS(null);setShowSettings(false);pop("👋 已退出登录");
+  };
+
+  return(
+    <div style={{marginBottom:16,paddingBottom:16,borderBottom:"2px dashed #EDD9A3"}}>
+      <div style={{fontSize:11,color:"#7A5C44",fontWeight:900,letterSpacing:.5,marginBottom:10}}>☁️ 账号与云同步</div>
+      {user ? (
+        <div style={{background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:12,color:"#3A7D3E",fontWeight:800}}>已登录</div>
+            <div style={{fontSize:11,color:"#5BAF5F",marginTop:2}}>{user.email||user.displayName||""}</div>
+          </div>
+          <button onClick={doSignOut} style={{fontSize:11,fontWeight:800,color:"#C0392B",background:"#FFF0EE",border:"2px solid #FFB3A8",borderRadius:10,padding:"6px 12px",cursor:"pointer"}}>退出</button>
+        </div>
+      ) : mode==="idle" ? (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{fontSize:12,color:"#B09070",marginBottom:2}}>登录后数据自动云端同步，多设备共享 🌿</div>
+          <button disabled={loading} onClick={doGoogle} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#fff",border:"2px solid #EDD9A3",borderRadius:14,padding:"11px",fontSize:13,fontWeight:800,color:"#3D2B1F",cursor:"pointer",boxShadow:"0 2px 6px rgba(90,60,30,.08)"}}>
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 2.9l5.7-5.7C34.2 6.6 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.1 7.9 2.9l5.7-5.7C34.2 6.6 29.4 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.4 35.5 26.8 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.6 5.1C9.6 39.6 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.3 4.1-4.2 5.4l6.2 5.2C43 34.2 44 29.5 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+            Google 账号登录
+          </button>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setMode("login")} style={{flex:1,background:"linear-gradient(135deg,#7BC67E,#5BAF5F)",border:"none",borderRadius:14,padding:"10px",fontSize:13,fontWeight:800,color:"#fff",cursor:"pointer"}}>📧 邮箱登录</button>
+            <button onClick={()=>setMode("register")} style={{flex:1,background:"#F0FFF0",border:"2px solid #7BC67E",borderRadius:14,padding:"10px",fontSize:13,fontWeight:800,color:"#3A7D3E",cursor:"pointer"}}>注册</button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <input style={{width:"100%",background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:12,padding:"10px 14px",fontSize:14,marginBottom:8,fontFamily:"inherit",color:"#3D2B1F",display:"block"}} type="email" placeholder="邮箱" value={email} onChange={e=>setEmail(e.target.value)}/>
+          <input style={{width:"100%",background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:12,padding:"10px 14px",fontSize:14,marginBottom:8,fontFamily:"inherit",color:"#3D2B1F",display:"block"}} type="password" placeholder="密码（6位以上）" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doEmail(mode==="register")}/>
+          {err&&<div style={{fontSize:12,color:"#C0392B",marginBottom:8}}>{err}</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button disabled={loading} onClick={()=>doEmail(mode==="register")} style={{flex:1,background:"linear-gradient(135deg,#7BC67E,#5BAF5F)",border:"none",borderRadius:12,padding:"10px",fontSize:13,fontWeight:900,color:"#fff",cursor:"pointer"}}>
+              {loading?"请稍候…":mode==="register"?"注册并登录":"登录"}
+            </button>
+            <button onClick={reset} style={{background:"#F5E6C8",border:"none",borderRadius:12,padding:"10px 14px",fontSize:13,color:"#A86440",cursor:"pointer"}}>取消</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CollapsibleRescueSection ─────────────────────────────
+function CollapsibleRescueSection({s,save,pop}){
+  const [open,setOpen]=useState(false);
+  return(
+    <div style={{marginBottom:16,paddingBottom:16,borderBottom:"2px dashed #EDD9A3"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",userSelect:"none"}} onClick={()=>setOpen(o=>!o)}>
+        <div style={{fontSize:11,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🎲 充能抽签库</div>
+        <span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{open?"收起 ▲":"展开 ▼"}</span>
+      </div>
+      {open&&<div style={{marginTop:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+          <span style={{fontSize:12,color:"#7A5C44",fontWeight:700}}>触发阈值</span>
+          <input type="number" min="0" max="100" style={{width:64,background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:10,padding:"6px 8px",fontSize:14,textAlign:"center",color:"#3D2B1F",fontFamily:"inherit"}} value={s.rescueThreshold} onChange={e=>save({...s,rescueThreshold:Number(e.target.value)||60})}/>
+          <span style={{fontSize:11,color:"#B09070"}}>低于此值时提醒</span>
+        </div>
+        {s.rescueList.map((item,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
+            <span style={{flex:1,fontSize:13}}>{item}</span>
+            <button style={{background:"#FFF0EE",border:"2px solid #FFB3A8",color:"#C0392B",borderRadius:12,padding:"7px 9px",fontSize:12,cursor:"pointer"}} onClick={()=>{const nl=[...s.rescueList];nl.splice(i,1);save({...s,rescueList:nl});pop("🗑️ 已删除");}}>🗑</button>
+          </div>
+        ))}
+        <RescueAdd onAdd={txt=>{if(txt.trim()){save({...s,rescueList:[...s.rescueList,txt.trim()]});pop("✅ 已添加");}}}/>
+      </div>}
     </div>
   );
 }
@@ -895,13 +1000,12 @@ function App(){
     save(merged);pop("✅ 数据导入成功！");setShowSettings(false);
   };
 
-  if(user===undefined||(!s&&user!==null))return(
+  if(!s)return(
     <div style={{minHeight:"100vh",background:"linear-gradient(180deg,#AEE6F8,#D4F0FF)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
       <div style={{animation:"float 2s ease-in-out infinite",fontSize:48}}>🌿</div>
       <div style={{color:"#5BAF5F",fontSize:14,fontWeight:700,letterSpacing:2}}>小岛加载中…</div>
     </div>
   );
-  if(user===null&&!s) return <LoginScreen onLogin={u=>{setUser(u);_fbUid=u.uid;}}/>;
 
   const today=todayKey(),th=s.checkedHabits[today]||{},doneCnt=s.habits.filter(h=>th[h.id]).length;
   const xpPct=Math.min(100,(s.player.xp/s.player.xpNext)*100);
@@ -972,10 +1076,7 @@ function App(){
               <div style={{fontSize:17,fontWeight:900,color:"#3D2B1F"}}>⚙️ 岛屿设置</div>
               <button style={{background:"#F5E6C8",border:"none",borderRadius:"50%",width:32,height:32,fontSize:16,cursor:"pointer",color:"#A86440"}} onClick={()=>setShowSettings(false)}>✕</button>
             </div>
-            {user&&<div style={{background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:12,color:"#3A7D3E",flex:1,fontWeight:700}}>☁️ {user.email||user.displayName||"已登录"}</span>
-              <button onClick={async()=>{await window._fbSignOut(window._fbAuth);setUser(null);setS(null);setShowSettings(false);pop("👋 已退出登录");}} style={{fontSize:11,fontWeight:800,color:"#C0392B",background:"#FFF0EE",border:"2px solid #FFB3A8",borderRadius:10,padding:"5px 12px",cursor:"pointer"}}>退出</button>
-            </div>}
+            <SettingsLoginSection user={user} setUser={setUser} setS={setS} setShowSettings={setShowSettings} pop={pop}/>
             <div style={S.settingSection}>
               <div style={S.cl}>🐚 角色设置</div>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -983,21 +1084,7 @@ function App(){
                 <input style={{...S.inp,marginBottom:0,flex:1}} value={s.player.name} onChange={e=>save({...s,player:{...s.player,name:e.target.value}})}/>
               </div>
             </div>
-            <div style={S.settingSection}>
-              <div style={S.cl}>🎲 充能抽签库</div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <span style={{fontSize:12,color:"#7A5C44",fontWeight:700}}>触发阈值</span>
-                <input type="number" min="0" max="100" style={{...S.inp,width:72,marginBottom:0}} value={s.rescueThreshold} onChange={e=>save({...s,rescueThreshold:Number(e.target.value)||60})}/>
-                <span style={{fontSize:11,color:"#B09070"}}>低于此值时提醒</span>
-              </div>
-              {s.rescueList.map((item,i)=>(
-                <div key={i} style={S.settingRow}>
-                  <span style={{flex:1,fontSize:13}}>{item}</span>
-                  <button style={S.xBtn} onClick={()=>{const nl=[...s.rescueList];nl.splice(i,1);save({...s,rescueList:nl});pop("🗑️ 已删除");}}>🗑</button>
-                </div>
-              ))}
-              <RescueAdd onAdd={txt=>{if(txt.trim()){save({...s,rescueList:[...s.rescueList,txt.trim()]});pop("✅ 已添加");}}}/>
-            </div>
+            <CollapsibleRescueSection s={s} save={save} pop={pop}/>
             <div style={S.settingSection}>
               <div style={S.cl}>💾 数据管理</div>
               <div style={{fontSize:12,color:"#B09070",marginBottom:10}}>包含徽章、大事记录、历史记录等全部数据</div>
@@ -1065,6 +1152,11 @@ function App(){
             </div>
             <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>点击属性 → 记录大事并调整数值</div>
           </ACCard>
+          {/* rescue quick action */}
+          <button style={{width:"100%",background:"linear-gradient(135deg,#FFF8E8,#FFF3C4)",border:"2.5px solid #FFD166",borderRadius:18,padding:"14px 10px",cursor:"pointer",boxShadow:"0 4px 14px rgba(255,209,102,.25)",textAlign:"center",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={()=>setModal("rescue")}>
+            <span style={{fontSize:22}}>🎲</span>
+            <span style={{fontSize:14,fontWeight:900,color:"#A06000"}}>充能抽签</span>
+          </button>
           {/* short stats */}
           <ACCard title="☀️ 今日状态">
             <div style={{display:"flex",gap:10}}>
@@ -1086,17 +1178,7 @@ function App(){
             </div>
             <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:6}}>每天 05:00 重置为80</div>
           </ACCard>
-          {/* rescue quick action */}
-          <div style={{display:"flex",gap:10,marginBottom:12}}>
-            <button style={{flex:1,background:"linear-gradient(135deg,#FFF8E8,#FFF3C4)",border:"2.5px solid #FFD166",borderRadius:18,padding:"14px 10px",cursor:"pointer",boxShadow:"0 4px 14px rgba(255,209,102,.25)",textAlign:"center"}} onClick={()=>setModal("rescue")}>
-              <div style={{fontSize:24,marginBottom:4}}>🎲</div>
-              <div style={{fontSize:12,fontWeight:800,color:"#A06000"}}>充能抽签</div>
-            </button>
-            <button style={{flex:1,background:"linear-gradient(135deg,#F0FFF0,#E8FFF0)",border:"2.5px solid #7BC67E",borderRadius:18,padding:"14px 10px",cursor:"pointer",boxShadow:"0 4px 14px rgba(123,198,126,.2)",textAlign:"center"}} onClick={()=>{setEvForm({text:"",xp:0,changes:{},tag:""});setModal("bigEvent");}}>
-              <div style={{fontSize:24,marginBottom:4}}>📝</div>
-              <div style={{fontSize:12,fontWeight:800,color:"#3A7D3E"}}>记录大事</div>
-            </button>
-          </div>
+          
           {/* motto */}
           <ACCard title="🍃 座右铭" action={
             <button style={S.editTxtBtn} onClick={()=>{setMottoD(s.motto||"");setEditingMotto(true);}}>编辑</button>
