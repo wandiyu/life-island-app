@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="theme-color" content="#7BC67E"/>
+  <title>人生小岛</title>
+
+  <!-- iOS Home Screen Icon: AC leaf logo on white background -->
+  <script>
+  (function(){
+    var c=document.createElement('canvas');
+    c.width=c.height=180;
+    var g=c.getContext('2d');
+    // rounded white bg
+    g.beginPath();
+    g.moveTo(36,0);g.lineTo(144,0);g.arcTo(180,0,180,36,36);
+    g.lineTo(180,144);g.arcTo(180,180,144,180,36);
+    g.lineTo(36,180);g.arcTo(0,180,0,144,36);
+    g.lineTo(0,36);g.arcTo(0,0,36,0,36);
+    g.closePath();g.fillStyle='#fff';g.fill();g.clip();
+
+    var G='#29B851';
+
+    // ── main leaf body ─────────────────────────────────────
+    // The AC leaf is a big rounded asymmetric blob, flat-ish on right, 
+    // bulging left, with the "dent" notch at top-right where stem meets body
+    g.beginPath();
+    g.moveTo(100,22);                              // top, just left of stem notch
+    g.bezierCurveTo(68,16,30,30,16,68);            // upper-left curve
+    g.bezierCurveTo(4,98,6,130,20,152);            // left side down
+    g.bezierCurveTo(36,174,64,184,92,178);         // bottom-left
+    g.bezierCurveTo(116,174,138,162,148,146);      // bottom-right (above hole)
+    // curl around the hole — go up-right then back
+    g.bezierCurveTo(160,128,162,108,154,90);       // right side
+    g.bezierCurveTo(148,74,138,58,128,44);         // upper right
+    g.bezierCurveTo(120,32,112,24,100,22);         // back to top
+    g.closePath();
+    g.fillStyle=G;g.fill();
+
+    // ── stem (upper right, tapered triangle pointing up-right) ──
+    g.beginPath();
+    g.moveTo(108,26);   // root on leaf
+    g.lineTo(136,-4);   // tip
+    g.lineTo(150,8);    // right edge of stem
+    g.lineTo(128,38);   // back down to leaf
+    g.closePath();
+    g.fillStyle=G;g.fill();
+
+    // ── white notch between stem and leaf body ──
+    g.beginPath();
+    g.moveTo(112,28);
+    g.bezierCurveTo(116,18,128,18,132,28);
+    g.bezierCurveTo(126,36,118,36,112,28);
+    g.closePath();
+    g.fillStyle='#fff';g.fill();
+
+    // ── white circular hole (bottom-right of leaf) ──
+    g.beginPath();
+    g.arc(126,152,30,0,Math.PI*2);
+    g.fillStyle='#fff';g.fill();
+
+    var png=c.toDataURL('image/png');
+    var lk=document.createElement('link');
+    lk.rel='apple-touch-icon';lk.href=png;
+    document.head.appendChild(lk);
+  })();
+  </script>
+
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+	const firebaseConfig = {
+ 	 apiKey: "AIzaSyBcwkF8O1xidOk4GDrQjbTA39TXWgzuP_Q",
+  	authDomain: "life-island-c8360.firebaseapp.com",
+ 	 projectId: "life-island-c8360",
+  	storageBucket: "life-island-c8360.firebasestorage.app",
+  	messagingSenderId: "584619221989",
+  	appId: "1:584619221989:web:195794361ba71241ab450c"
+	};
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const googleProvider = new GoogleAuthProvider();
+
+    window._fbAuth = auth;
+    window._fbDb = db;
+    window._fbGoogleProvider = googleProvider;
+    window._fbSignInWithPopup = signInWithPopup;
+    window._fbSignInWithEmail = signInWithEmailAndPassword;
+    window._fbCreateUser = createUserWithEmailAndPassword;
+    window._fbSignOut = signOut;
+    window._fbOnAuthStateChanged = onAuthStateChanged;
+    window._fbDoc = doc;
+    window._fbGetDoc = getDoc;
+    window._fbSetDoc = setDoc;
+    window.dispatchEvent(new Event("firebase-ready"));
+  <\/script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+
+  <style>
+    :root {
+      --green:   #7BC67E;
+      --green2:  #5BAF5F;
+      --green3:  #4A9650;
+      --leaf:    #A8D8A8;
+      --sky:     #AEE6F8;
+      --sky2:    #7DD4F0;
+      --sand:    #F5E6C8;
+      --sand2:   #EDD9A3;
+      --brown:   #A86440;
+      --brown2:  #7A4A2E;
+      --cream:   #FFFDF5;
+      --warm:    #FFF8E8;
+      --text:    #3D2B1F;
+      --text2:   #7A5C44;
+      --text3:   #B09070;
+      --red:     #FF7B6B;
+      --yellow:  #FFD166;
+      --blue:    #70B8E0;
+      --pink:    #FFB3C6;
+      --purple:  #8B5CF6;
+      --card-shadow: 0 4px 20px rgba(90,60,30,.1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html,body { height:100%; }
+    body {
+      font-family:'Nunito','Noto Sans SC','PingFang SC',sans-serif;
+      background: var(--sky);
+      min-height:100vh;
+    }
+    input,textarea,button { font-family:inherit; outline:none; }
+    #root { min-height:100vh; }
+
+    @keyframes badgePop   { 0%{transform:scale(0) rotate(-15deg);opacity:0} 70%{transform:scale(1.2) rotate(3deg)} 100%{transform:scale(1) rotate(0);opacity:1} }
+    @keyframes float      { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+    @keyframes leafSway   { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
+    @keyframes fadeSlideUp{ 0%{opacity:0;transform:translateY(16px)} 100%{opacity:1;transform:translateY(0)} }
+    @keyframes pop        { 0%{transform:scale(.85);opacity:0} 100%{transform:scale(1);opacity:1} }
+    @keyframes shimmer    { 0%,100%{opacity:.8} 50%{opacity:1} }
+    @keyframes bounce     { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--leaf); border-radius:4px; }
+
+    /* tab bar pill active indicator */
+    .tab-active { position:relative; }
+    .tab-active::after {
+      content:''; position:absolute; bottom:-2px; left:50%; transform:translateX(-50%);
+      width:5px; height:5px; border-radius:50%; background:var(--green2);
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── storage ─────────────────────────────────────────────
+const DB_KEY = "lrpg6";
+const dbGet  = () => { try { const v=localStorage.getItem(DB_KEY); return v?JSON.parse(v):null; } catch{ return null; } };
+const dbSet  = (v) => { try { localStorage.setItem(DB_KEY, JSON.stringify(v)); } catch{} };
+
+// ─── time ────────────────────────────────────────────────
+const todayKey = () => new Date().toLocaleDateString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit" });
+const nowHour  = () => new Date().getHours();
+const weekKey  = d => { const dt=new Date(d||Date.now()); const y=dt.getFullYear(); const s=new Date(y,0,1); return `${y}-W${Math.ceil(((dt-s)/86400000+s.getDay()+1)/7)}`; };
+const monthKey = d => { const dt=new Date(d||Date.now()); return `${dt.getFullYear()}-${dt.getMonth()+1}`; };
+const canDoR   = q => { if (!q.lastDone) return true; if (q.period==="weekly") return weekKey()!==weekKey(q.lastDone); if (q.period==="monthly") return monthKey()!==monthKey(q.lastDone); return true; };
+
+// ─── badge system ────────────────────────────────────────
+const BADGE_LANDMARKS = [
+  {name:"马丘比丘",rarity:"common"},{name:"吴哥窟",rarity:"common"},{name:"科隆大教堂",rarity:"common"},
+  {name:"博斯普鲁斯",rarity:"common"},{name:"布达城堡",rarity:"common"},{name:"阿尔罕布拉",rarity:"common"},
+  {name:"特伦托城堡",rarity:"common"},{name:"卢浮宫",rarity:"common"},{name:"圣彼得堡",rarity:"common"},
+  {name:"蓝色清真寺",rarity:"common"},{name:"科托尔古城",rarity:"common"},{name:"斯科普里广场",rarity:"common"},
+  {name:"里斯本电车",rarity:"common"},{name:"鹿特丹港",rarity:"common"},{name:"海德堡城堡",rarity:"common"},
+  {name:"维也纳金厅",rarity:"common"},{name:"布拉格时钟",rarity:"common"},{name:"华沙旧城",rarity:"common"},
+  {name:"萨格勒布广场",rarity:"common"},{name:"塔林古城",rarity:"common"},{name:"里加老城",rarity:"common"},
+  {name:"西贡天后庙",rarity:"common"},{name:"清迈古城",rarity:"common"},{name:"仰光大金塔",rarity:"common"},
+  {name:"台北101",rarity:"common"},{name:"首尔景福宫",rarity:"common"},{name:"江户东京",rarity:"common"},
+  {name:"北京天坛",rarity:"common"},{name:"西安钟楼",rarity:"common"},{name:"成都宽窄巷",rarity:"common"},
+  {name:"大峡谷",rarity:"rare"},{name:"乞力马扎罗",rarity:"rare"},{name:"圣托里尼",rarity:"rare"},
+  {name:"冰岛极光",rarity:"rare"},{name:"帕特农神庙",rarity:"rare"},{name:"罗马斗兽场",rarity:"rare"},
+  {name:"安纳普尔纳",rarity:"rare"},{name:"亚马逊雨林",rarity:"rare"},{name:"死海沙漠",rarity:"rare"},
+  {name:"纳米布沙漠",rarity:"rare"},{name:"科科斯岛",rarity:"rare"},{name:"加拉帕戈斯",rarity:"rare"},
+  {name:"贝加尔湖",rarity:"rare"},{name:"哈瓦苏坝",rarity:"rare"},{name:"佩特拉玫瑰城",rarity:"rare"},
+  {name:"复活节岛",rarity:"rare"},{name:"斯匹次卑尔根",rarity:"rare"},{name:"帕伦克",rarity:"rare"},
+  {name:"麦迪那古城",rarity:"rare"},{name:"撒马尔罕",rarity:"rare"},
+  {name:"珠穆朗玛",rarity:"legend"},{name:"南极洲",rarity:"legend"},{name:"北极点",rarity:"legend"},
+  {name:"马里亚纳海沟",rarity:"legend"},{name:"亚特兰蒂斯",rarity:"legend"},{name:"图勒",rarity:"legend"},
+  {name:"香格里拉",rarity:"legend"},{name:"神农架秘境",rarity:"legend"},{name:"宇宙边界",rarity:"legend"},
+  {name:"时间尽头",rarity:"legend"},
+];
+
+const RARITY_CFG = {
+  common: { bg:"#F0FFF0", border:"#7BC67E", text:"#3A7D3E", glow:"rgba(123,198,126,.4)", label:"普通", star:"⭐" },
+  rare:   { bg:"#EEF4FF", border:"#7BAAE0", text:"#2855A0", glow:"rgba(123,170,224,.5)", label:"稀有", star:"💎" },
+  legend: { bg:"#FFFBEE", border:"#FFD166", text:"#A06000", glow:"rgba(255,209,102,.7)", label:"传说", star:"✨" },
+};
+
+const seededRand = (seed) => {
+  let h=0; for(let i=0;i<seed.length;i++) h=Math.imul(31,h)+seed.charCodeAt(i)|0;
+  return ()=>{ h^=h<<13; h^=h>>17; h^=h<<5; return (h>>>0)/4294967296; };
+};
+
+const getBadgeParams = (name,rarity) => {
+  const r=seededRand(name+rarity);
+  const sides=rarity==="legend"?[6,7,8][Math.floor(r()*3)]:rarity==="rare"?[4,5,6][Math.floor(r()*3)]:[0,3,4][Math.floor(r()*3)];
+  const palettes=[
+    ["#FF9A8B","#FFD3B6"],["#A8EDEA","#FED6E3"],["#A18CD1","#FBC2EB"],
+    ["#FCCB90","#D57EEB"],["#84FAB0","#8FD3F4"],["#FDDB92","#D1FDFF"],
+    ["#B7F8DB","#50A7C2"],["#FEC195","#FF7BB3"],["#E0C3FC","#8EC5FC"],
+    ["#F9D976","#F39F86"],
+  ];
+  const pal=palettes[Math.floor(r()*palettes.length)];
+  const rot=Math.floor(r()*360);
+  return {sides,c1:pal[0],c2:pal[1],rot};
+};
+
+function BadgeSVG({name,rarity,size=60}){
+  const p=getBadgeParams(name,rarity);
+  const rc=RARITY_CFG[rarity];
+  const cx=size/2,cy=size/2,r=size*.42;
+  let shapePath=null;
+  if(p.sides!==0){
+    const pts=[];
+    for(let i=0;i<p.sides;i++){
+      const a=(i*2*Math.PI/p.sides)-Math.PI/2+(p.rot*Math.PI/180);
+      pts.push([cx+r*Math.cos(a),cy+r*Math.sin(a)]);
+    }
+    // rounded polygon via quadratic curves
+    shapePath=pts.map((pt,i)=>`${i===0?"M":"L"}${pt[0].toFixed(1)},${pt[1].toFixed(1)}`).join(" ")+"Z";
+  }
+  const uid=`b${name.charCodeAt(0)}${name.charCodeAt(1)||0}${rarity[0]}`;
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} style={{display:"block",filter:`drop-shadow(0 2px ${rarity==="legend"?8:4}px ${rc.glow})`}}>
+      <defs>
+        <linearGradient id={`g${uid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={p.c1}/>
+          <stop offset="100%" stopColor={p.c2}/>
+        </linearGradient>
+      </defs>
+      {shapePath===null
+        ?<circle cx={cx} cy={cy} r={r} fill={`url(#g${uid})`} stroke={rc.border} strokeWidth={size*.05}/>
+        :<path d={shapePath} fill={`url(#g${uid})`} stroke={rc.border} strokeWidth={size*.05} strokeLinejoin="round"/>
+      }
+      {rarity==="legend"&&<circle cx={cx} cy={cy} r={r*.65} fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="1.5" strokeDasharray="3 3"/>}
+      <circle cx={cx*.7} cy={cy*.65} r={size*.07} fill="rgba(255,255,255,.5)"/>
+      <text x={cx} y={cy+size*.07} textAnchor="middle" fontSize={size*.2} fill="rgba(255,255,255,.95)" fontWeight="800" style={{fontFamily:"'Nunito','Noto Sans SC',sans-serif"}}>
+        {name.slice(0,2)}
+      </text>
+    </svg>
+  );
+}
+
+const grantBadge=(level,existing)=>{
+  const rand=Math.random();
+  let pool;
+  if(level>=15&&rand<.15) pool=BADGE_LANDMARKS.filter(b=>b.rarity==="legend");
+  else if(level>=5&&rand<.35) pool=BADGE_LANDMARKS.filter(b=>b.rarity==="rare");
+  else pool=BADGE_LANDMARKS.filter(b=>b.rarity==="common");
+  const owned=new Set(existing.map(b=>b.name));
+  const avail=pool.filter(b=>!owned.has(b.name));
+  const src=avail.length>0?avail:pool;
+  const pick=src[Math.floor(Math.random()*src.length)];
+  return{...pick,id:Date.now(),level,date:todayKey()};
+};
+
+// ─── defaults ────────────────────────────────────────────
+const DEF_LONG={
+  health:{label:"健康",icon:"🌿",value:60,color:"#5BAF5F"},
+  wealth:{label:"财富",icon:"💰",value:60,color:"#E8A020"},
+  social:{label:"友情",icon:"🤝",value:60,color:"#70B8E0"},
+  growth:{label:"成长",icon:"📚",value:60,color:"#8B5CF6"},
+};
+const DEF_SHORT={
+  mood:  {label:"心情",icon:"☀️",value:80,color:"#FF9A5C"},
+  energy:{label:"体力",icon:"⚡",value:80,color:"#7BC67E"},
+};
+const DEF_HABITS=[
+  {id:"sleep",   label:"早睡",icon:"🌙",weeklyBonus:{stats:["health"]},weeklyTarget:6,shortBonus:{energy:20,mood:10}},
+  {id:"exercise",label:"运动",icon:"🏃",weeklyBonus:{stats:["health"]},weeklyTarget:3,shortBonus:{energy:18,mood:8}},
+  {id:"reading", label:"读书",icon:"📖",weeklyBonus:{stats:["growth"]},weeklyTarget:7,shortBonus:{mood:12}},
+  {id:"meditate",label:"冥想",icon:"🧘",weeklyBonus:{stats:[]},        weeklyTarget:6,shortBonus:{mood:15,energy:6}},
+  {id:"outdoor", label:"户外",icon:"🌿",weeklyBonus:{stats:["health"]},weeklyTarget:5,shortBonus:{mood:12,energy:8}},
+  {id:"writing", label:"写作",icon:"✍️",weeklyBonus:{stats:["growth"]},weeklyTarget:3,shortBonus:{mood:9}},
+  {id:"focus",   label:"专注",icon:"🎯",weeklyBonus:{stats:["growth"]},weeklyTarget:4,shortBonus:{mood:5}},
+];
+const DEF_RESCUE=["去运动一下","弹尤克里里","冥想10分钟","出门散散步","喝杯热茶"];
+
+const INIT={
+  player:        {name:"旅行者",level:1,xp:0,xpNext:100},
+  longStats:     DEF_LONG,
+  shortStats:    DEF_SHORT,
+  habits:        DEF_HABITS,
+  checkedHabits: {},
+  mainQuests:[
+    {id:1,title:"建立稳定收入来源",desc:"副业或主业的突破",      reward:{xp:20,long:{wealth:10}},done:false},
+    {id:2,title:"养成运动习惯",    desc:"每周锻炼3次，坚持3个月",reward:{xp:20,long:{health:8}}, done:false},
+  ],
+  sideQuests:[
+    {id:3,title:"读完一本书",desc:"本月内完成",   reward:{xp:5,short:{mood:12}},done:false},
+    {id:4,title:"联系老朋友",desc:"这周打个电话", reward:{xp:5, long:{social:5}},done:false},
+  ],
+  recurringQuests:[
+    {id:"r1",title:"每周复盘", desc:"周日晚回顾本周",    period:"weekly", reward:{xp:5,long:{health:1}},lastDone:""},
+    {id:"r2",title:"月度总结",desc:"每月最后一天写总结",period:"monthly",reward:{xp:5,long:{wealth:2}},lastDone:""},
+  ],
+  rescueList:     DEF_RESCUE,
+  rescueThreshold:60,
+  badges:         [],
+  dayColors:      {},   // dateKey → hex color chosen by user
+  daySummaries:   {},   // dateKey → one-line summary string
+  eventTags:      ["担心","开心","感恩","反思","突破"],  // user-editable
+  motto:          "生活是一场冒险，每天都是新的探索 🌿",
+  letter:         "",
+  bigEvents:      [],
+  history:        [],
+  lastDate:       null,
+  lastResetDate:  null,
+  lastWeeklySettleDate: "",
+  pendingWeeklyResult: null,
+};
+
+const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
+const applyB = (stats,bonus={})=>{
+  const out={};
+  Object.keys(stats).forEach(k=>{out[k]={...stats[k],value:clamp(stats[k].value+(bonus[k]||0))};});
+  return out;
+};
+// Apply bonus to longStats with overflow → flowers
+const applyLongWithOverflow = (longStats, bonus={})=>{
+  const out={...longStats};
+  let extraFlowers=0;
+  Object.keys(bonus).forEach(k=>{
+    if(!out[k])return;
+    const newVal=out[k].value+(bonus[k]||0);
+    if(newVal>100){extraFlowers+=Math.floor(newVal-100);out[k]={...out[k],value:100};}
+    else{out[k]={...out[k],value:Math.max(0,Math.round(newVal))};}
+  });
+  return{longStats:out,extraFlowers};
+};
+
+// Get week key in 年-W周 format (week starts Sunday)
+const getWeekKey = (date=new Date())=>{
+  const d=new Date(date);
+  const day=d.getDay(); // 0=Sunday
+  const sunday=new Date(d);sunday.setDate(d.getDate()-day);
+  const y=sunday.getFullYear();
+  const start=new Date(y,0,1);
+  const weekNum=Math.ceil(((sunday-start)/86400000+start.getDay()+1)/7);
+  return `${y}-W${weekNum}`;
+};
+
+// Get the Saturday of the current week
+const getWeekSaturday = ()=>{
+  const d=new Date();
+  const day=d.getDay();
+  const sat=new Date(d);sat.setDate(d.getDate()+(6-day));
+  return sat;
+};
+
+// Count how many times a habit was checked this week (Sun–Sat)
+const countWeekChecks=(checkedHabits,habitId)=>{
+  let count=0;
+  const now=new Date();
+  const day=now.getDay();
+  const sunday=new Date(now);sunday.setDate(now.getDate()-day);
+  for(let i=0;i<=6;i++){
+    const dt=new Date(sunday);dt.setDate(sunday.getDate()+i);
+    const k=dt.toLocaleDateString("zh-CN",{year:"numeric",month:"2-digit",day:"2-digit"});
+    if(checkedHabits[k]&&checkedHabits[k][habitId])count++;
+  }
+  return count;
+};
+
+// Migrate old weeklyBonus.stat (string) to weeklyBonus.stats (array)
+const migrateWeeklyBonus=(h)=>{
+  if(!h.weeklyBonus) return {...h,weeklyBonus:{stats:[]},weeklyTarget:h.weeklyTarget||5};
+  if(h.weeklyBonus.stat!==undefined&&!h.weeklyBonus.stats){
+    const st=h.weeklyBonus.stat;
+    return {...h,weeklyBonus:{stats:st?[st]:[]},weeklyTarget:h.weeklyTarget||5};
+  }
+  if(!h.weeklyBonus.stats) return {...h,weeklyBonus:{...h.weeklyBonus,stats:[]},weeklyTarget:h.weeklyTarget||5};
+  if(h.weeklyTarget===undefined) return {...h,weeklyTarget:5};
+  return h;
+};
+
+// Run weekly settlement - returns {newLongStats, extraFlowers, gains}
+const runWeeklySettle=(habits,checkedHabits,longStats)=>{
+  const gains=[];
+  let bonusMap={};
+  habits.forEach(h=>{
+    const stats=h.weeklyBonus?.stats||[];
+    const target=h.weeklyTarget||5;
+    const cnt=countWeekChecks(checkedHabits,h.id);
+    if(cnt>=target&&stats.length>0){
+      stats.forEach(stat=>{
+        if(!longStats[stat])return;
+        gains.push({label:h.label,icon:h.icon,delta:1,stat});
+        bonusMap[stat]=(bonusMap[stat]||0)+1;
+      });
+    }
+  });
+  const{longStats:newLong,extraFlowers}=applyLongWithOverflow(longStats,bonusMap);
+  return{newLongStats:newLong,extraFlowers,gains};
+};
+const rwdTxt=(r={},ls=DEF_LONG,ss=DEF_SHORT)=>{
+  const p=[`+${r.xp||0} 🌸`];
+  Object.entries(r.long||{}).forEach(([k,v])=>p.push(`${ls[k]?.icon||""}长期+${v}`));
+  Object.entries(r.short||{}).forEach(([k,v])=>p.push(`${ss[k]?.icon||""}今日+${v}`));
+  return p.join(" · ");
+};
+
+// ─── import/export ───────────────────────────────────────
+const exportData=s=>{
+  const payload={
+    version:4,
+    exportedAt:new Date().toISOString(),
+    player:s.player,
+    longStats:s.longStats,
+    shortStats:s.shortStats,
+    mainQuests:s.mainQuests,
+    sideQuests:s.sideQuests,
+    recurringQuests:s.recurringQuests,
+    habits:s.habits,
+    checkedHabits:s.checkedHabits||{},
+    rescueList:s.rescueList,
+    rescueThreshold:s.rescueThreshold,
+    badges:s.badges||[],
+    eventTags:s.eventTags||[],
+    dayColors:s.dayColors||{},
+    daySummaries:s.daySummaries||{},
+    motto:s.motto||"",
+    letter:s.letter,
+    bigEvents:s.bigEvents||[],
+    history:s.history||[],
+    lastWeeklySettleDate:s.lastWeeklySettleDate||"",
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download=`island_backup_${todayKey().replace(/\//g,"-")}.json`; a.click(); URL.revokeObjectURL(url);
+};
+const importData=(file,onSuccess,onError)=>{
+  const reader=new FileReader();
+  reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.player||!d.longStats)throw new Error("格式不正确");onSuccess(d);}catch(err){onError(err.message);}};
+  reader.readAsText(file);
+};
+
+// ─── decorative SVG components ───────────────────────────
+const Leaf=({x,y,r=0,s=1,c="#7BC67E"})=>(
+  <g transform={`translate(${x},${y}) rotate(${r}) scale(${s})`} style={{opacity:.7}}>
+    <path d="M0,-14 C8,-8 14,0 0,14 C-14,0 -8,-8 0,-14Z" fill={c}/>
+    <line x1="0" y1="-10" x2="0" y2="10" stroke="rgba(255,255,255,.4)" strokeWidth="1.5"/>
+  </g>
+);
+
+// AC-style header cloud/hill SVG
+function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear}){
+  const hour=new Date().getHours();
+  const isNight=hour<6||hour>=20;
+  const isEvening=hour>=17&&hour<20;
+  const skyTop=isNight?"#1A2A4A":isEvening?"#FF8C5A":"#AEE6F8";
+  const skyBot=isNight?"#2A3A6A":isEvening?"#FFB870":"#D4F0FF";
+  const groundC=isNight?"#3A7040":isEvening?"#4A8A50":"#5BAF5F";
+  const grassC =isNight?"#4A9050":isEvening?"#5ABF60":"#7BC67E";
+
+  return(
+    <div style={{position:"relative",overflow:"hidden",userSelect:"none"}}>
+      {/* sky gradient */}
+      <div style={{position:"absolute",inset:0,background:`linear-gradient(180deg,${skyTop} 0%,${skyBot} 100%)`}}/>
+
+      {/* clouds */}
+      <svg style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",overflow:"visible"}} viewBox="0 0 390 200" preserveAspectRatio="xMidYMid slice">
+        {!isNight&&<>
+          <g opacity=".9"><ellipse cx="60" cy="45" rx="32" ry="18" fill="#fff"/><ellipse cx="80" cy="38" rx="24" ry="16" fill="#fff"/><ellipse cx="40" cy="42" rx="20" ry="14" fill="#fff"/></g>
+          <g opacity=".8"><ellipse cx="280" cy="32" rx="26" ry="15" fill="#fff"/><ellipse cx="300" cy="26" rx="20" ry="13" fill="#fff"/><ellipse cx="262" cy="30" rx="16" ry="11" fill="#fff"/></g>
+        </>}
+        {isNight&&<>
+          <circle cx="60" cy="30" r="8" fill="#FFF9C4" opacity=".9"/>
+          <circle cx="63" cy="29" r="7" fill={skyTop}/>
+          {[[120,20],[200,40],[310,15],[350,35]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r="1.5" fill="#FFF9C4" opacity=".8"/>)}
+          {[[80,50],[160,25],[250,55],[330,28]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r="1" fill="#FFF9C4" opacity=".6"/>)}
+        </>}
+
+        {/* hills / ground */}
+        <path d="M0,160 Q60,120 130,145 Q200,170 280,130 Q340,105 390,140 L390,200 L0,200Z" fill={groundC}/>
+        <path d="M0,175 Q80,155 170,168 Q260,180 390,162 L390,200 L0,200Z" fill={grassC}/>
+
+        {/* decorative trees */}
+        <g transform="translate(18,120)">
+          <rect x="-4" y="24" width="8" height="18" rx="4" fill="#A86440"/>
+          <circle cx="0" cy="14" r="18" fill="#5BAF5F"/>
+          <circle cx="0" cy="10" r="14" fill="#7BC67E"/>
+          <circle cx="-4" cy="18" r="11" fill="#62C96A"/>
+          <circle cx="4" cy="18" r="11" fill="#62C96A"/>
+          <circle cx="-5" cy="6" r="6" fill="rgba(255,255,255,.15)"/>
+        </g>
+        <g transform="translate(355,115)">
+          <rect x="-3" y="20" width="7" height="15" rx="3" fill="#A86440"/>
+          <circle cx="0" cy="12" r="16" fill="#4A9650"/>
+          <circle cx="0" cy="8" r="12" fill="#62C96A"/>
+          <circle cx="-4" cy="7" r="5" fill="rgba(255,255,255,.15)"/>
+        </g>
+
+        {/* flower decorations — kept well inside the ground strip */}
+        {[[55,168],[130,172],[240,166],[310,170]].map(([x,y],i)=>(
+          <g key={i} transform={`translate(${x},${y})`}>
+            {[0,72,144,216,288].map(a=><ellipse key={a} cx={Math.cos(a*Math.PI/180)*4} cy={Math.sin(a*Math.PI/180)*4} rx="2.5" ry="1.8" fill={["#FF9B9B","#FFD166","#FF9BDE","#B8F5A8","#9BDEFF"][i]}/>)}
+            <circle cx="0" cy="0" r="2.5" fill="#FFF"/>
+          </g>
+        ))}
+
+        {/* leaf decorations on ground */}
+        <Leaf x={90} y={168} r={20} s={.7} c="#6BC870"/>
+        <Leaf x={195} y={172} r={-15} s={.65} c="#5BAF5F"/>
+        <Leaf x={340} y={166} r={30} s={.8} c="#6BC870"/>
+      </svg>
+
+      {/* content overlay */}
+      <div style={{position:"relative",padding:`max(52px,env(safe-area-inset-top,52px)) 20px 0`,paddingBottom:0}}>
+        {/* gear btn */}
+        <button onClick={onGear} style={{position:"absolute",top:"max(16px,env(safe-area-inset-top,16px))",right:16,width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.55)",border:"2px solid rgba(255,255,255,.8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",backdropFilter:"blur(4px)",zIndex:5}}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#5BAF5F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+
+        {/* player info */}
+        <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:10}}>
+          <div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.85)",fontWeight:700,letterSpacing:1,marginBottom:2}}>
+              {new Date().toLocaleDateString("zh-CN",{month:"long",day:"numeric",weekday:"short"})}
+            </div>
+            <div style={{fontSize:26,fontWeight:900,color:"#fff",lineHeight:1.1,textShadow:"0 2px 8px rgba(0,0,0,.15)"}}>
+              {playerName}的小岛
+            </div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.9)",marginTop:2,fontWeight:600}}>
+              🏝️ Lv.{level} 岛民 · {xp}/{xpNext} 🌸
+            </div>
+          </div>
+          {/* XP ring */}
+          <div style={{position:"relative",width:64,height:64}}>
+            <svg viewBox="0 0 64 64" width="64" height="64">
+              <circle cx="32" cy="32" r="26" fill="rgba(255,255,255,.25)" stroke="none"/>
+              <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="6"/>
+              <circle cx="32" cy="32" r="26" fill="none" stroke="#fff" strokeWidth="6"
+                strokeDasharray={`${xpPct*1.634} 163.4`} strokeLinecap="round"
+                style={{transform:"rotate(-90deg)",transformOrigin:"center",transition:"stroke-dasharray .6s"}}/>
+            </svg>
+            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontSize:10,fontWeight:900,color:"#fff",lineHeight:1}}>{Math.round(xpPct)}%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* habit pills */}
+        <div style={{display:"flex",gap:6,alignItems:"center",paddingBottom:18,flexWrap:"wrap",marginTop:4}}>
+          {habits.map(h=>{
+            const done=!!th[h.id];
+            return(
+              <div key={h.id} title={h.label} style={{
+                width:32,height:32,borderRadius:"50%",
+                background:done?"rgba(255,255,255,.9)":"rgba(255,255,255,.3)",
+                border:`2px solid ${done?"rgba(255,255,255,.95)":"rgba(255,255,255,.4)"}`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:15,transition:"all .25s",
+                boxShadow:done?"0 2px 8px rgba(0,0,0,.15)":"none",
+              }}>{h.icon}</div>
+            );
+          })}
+          <span style={{fontSize:11,color:"rgba(255,255,255,.85)",fontWeight:700,marginLeft:2}}>{doneCnt}/{totalHabits}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── LoginScreen ─────────────────────────────────────────
+function LoginScreen({onLogin}){
+  const [mode,setMode]=useState("choose"); // choose|email
+  const [isReg,setIsReg]=useState(false);
+  const [email,setEmail]=useState("");
+  const [pass,setPass]=useState("");
+  const [err,setErr]=useState("");
+  const [loading,setLoading]=useState(false);
+
+  const doGoogle=async()=>{
+    setLoading(true);setErr("");
+    try{
+      const r=await window._fbSignInWithPopup(window._fbAuth,window._fbGoogleProvider);
+      onLogin(r.user);
+    }catch(e){setErr(e.message);}
+    setLoading(false);
+  };
+  const doEmail=async()=>{
+    if(!email||!pass){setErr("请填写邮箱和密码");return;}
+    setLoading(true);setErr("");
+    try{
+      const fn=isReg?window._fbCreateUser:window._fbSignInWithEmail;
+      const r=await fn(window._fbAuth,email,pass);
+      onLogin(r.user);
+    }catch(e){
+      const msg=e.code==="auth/user-not-found"?"账号不存在":e.code==="auth/wrong-password"?"密码错误":e.code==="auth/email-already-in-use"?"邮箱已注册":e.message;
+      setErr(msg);
+    }
+    setLoading(false);
+  };
+
+  return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(180deg,#AEE6F8 0%,#D4F0FF 60%,#E8F5E9 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
+      <div style={{fontSize:52,marginBottom:8,animation:"float 2.5s ease-in-out infinite"}}>🌿</div>
+      <div style={{fontSize:26,fontWeight:900,color:"#3D2B1F",marginBottom:4}}>人生小岛</div>
+      <div style={{fontSize:13,color:"#7A5C44",marginBottom:32,fontWeight:600}}>记录你的成长旅程 🏝️</div>
+
+      <div style={{background:"#FFFDF5",borderRadius:24,padding:"28px 24px",width:"100%",maxWidth:360,boxShadow:"0 8px 32px rgba(90,60,30,.12)",border:"2px solid #EDD9A3"}}>
+        {mode==="choose"&&<>
+          <button disabled={loading} onClick={doGoogle} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"#fff",border:"2px solid #EDD9A3",borderRadius:16,padding:"14px",fontSize:15,fontWeight:800,color:"#3D2B1F",cursor:"pointer",marginBottom:12,boxShadow:"0 2px 8px rgba(90,60,30,.1)"}}>
+            <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 2.9l5.7-5.7C34.2 6.6 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.1 7.9 2.9l5.7-5.7C34.2 6.6 29.4 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.4 35.5 26.8 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.6 5.1C9.6 39.6 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.3 4.1-4.2 5.4l6.2 5.2C43 34.2 44 29.5 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+            使用 Google 账号登录
+          </button>
+          <button disabled={loading} onClick={()=>setMode("email")} style={{width:"100%",background:"linear-gradient(135deg,#7BC67E,#5BAF5F)",border:"none",borderRadius:16,padding:"14px",fontSize:15,fontWeight:800,color:"#fff",cursor:"pointer",boxShadow:"0 4px 16px rgba(91,175,95,.4)"}}>
+            📧 邮箱登录 / 注册
+          </button>
+          {err&&<div style={{marginTop:12,fontSize:12,color:"#C0392B",textAlign:"center"}}>{err}</div>}
+        </>}
+
+        {mode==="email"&&<>
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            {["登录","注册"].map((l,i)=>(
+              <button key={l} onClick={()=>{setIsReg(i===1);setErr("");}} style={{flex:1,padding:"9px",borderRadius:12,border:`2px solid ${isReg===(i===1)?"#7BC67E":"#EDD9A3"}`,background:isReg===(i===1)?"#F0FFF0":"#FFFDF5",color:isReg===(i===1)?"#3A7D3E":"#B09070",fontWeight:isReg===(i===1)?900:600,cursor:"pointer",fontSize:13}}>{l}</button>
+            ))}
+          </div>
+          <input style={{width:"100%",background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:12,padding:"12px 14px",fontSize:14,marginBottom:8,fontFamily:"inherit",color:"#3D2B1F"}} type="email" placeholder="邮箱" value={email} onChange={e=>setEmail(e.target.value)}/>
+          <input style={{width:"100%",background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:12,padding:"12px 14px",fontSize:14,marginBottom:12,fontFamily:"inherit",color:"#3D2B1F"}} type="password" placeholder="密码（6位以上）" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doEmail()}/>
+          {err&&<div style={{fontSize:12,color:"#C0392B",marginBottom:10,textAlign:"center"}}>{err}</div>}
+          <button disabled={loading} onClick={doEmail} style={{width:"100%",background:"linear-gradient(135deg,#7BC67E,#5BAF5F)",border:"none",borderRadius:14,padding:"14px",fontSize:15,fontWeight:900,color:"#fff",cursor:"pointer",boxShadow:"0 4px 16px rgba(91,175,95,.4)",marginBottom:8}}>
+            {loading?"请稍候…":isReg?"注册并登录":"登录"}
+          </button>
+          <button onClick={()=>{setMode("choose");setErr("");}} style={{width:"100%",background:"none",border:"none",color:"#B09070",fontSize:12,cursor:"pointer",padding:"6px"}}>← 返回</button>
+        </>}
+      </div>
+      <div style={{fontSize:11,color:"#7A5C44",marginTop:16,opacity:.6}}>数据安全存储在云端 ☁️</div>
+    </div>
+  );
+}
+
+// ─── app ─────────────────────────────────────────────────
+function App(){
+  const [user,        setUser]         = useState(undefined); // undefined=loading, null=logged out, obj=logged in
+  const [s,           setS]           = useState(null);
+  const [tab,         setTab]         = useState("home");
+  const [toast,       setToast]       = useState(null);
+  const [modal,       setModal]       = useState(null);
+  const [drawn,       setDrawn]       = useState(null);
+  const [qForm,       setQForm]       = useState(null);
+  const [evForm,      setEvForm]      = useState(null);
+  const [habEdit,     setHabEdit]     = useState(null);
+  const [letterD,     setLetterD]     = useState("");
+  const [newBadge,    setNewBadge]    = useState(null);
+  const [showSettings,setShowSettings]= useState(false);
+  const [editingMotto,setEditingMotto]= useState(false);
+  const [mottoD,      setMottoD]      = useState("");
+  const [showWeeklyResult,setShowWeeklyResult]=useState(false);
+  const popT     = useRef(null);
+  const importRef= useRef(null);
+
+  // Firebase auth state listener
+  useEffect(()=>{
+    const waitForFb = () => {
+      if(window._fbOnAuthStateChanged&&window._fbAuth){
+        window._fbOnAuthStateChanged(window._fbAuth, async (fbUser)=>{
+          if(fbUser){
+            _fbUid = fbUser.uid;
+            setUser(fbUser);
+          } else {
+            _fbUid = null;
+            setUser(null);
+          }
+        });
+      } else {
+        // Firebase not loaded yet - use localStorage only
+        setUser(null);
+      }
+    };
+    if(window._fbAuth) waitForFb();
+    else window.addEventListener("firebase-ready", waitForFb, {once:true});
+    // Timeout fallback: if Firebase never loads, just go local
+    const t = setTimeout(()=>{ if(user===undefined) setUser(null); }, 3000);
+    return ()=>clearTimeout(t);
+  },[]);
+
+  // Load data when user state is known
+  useEffect(()=>{
+    if(user===undefined) return; // still loading
+    const initData = async () => {
+    const today=todayKey();
+    let d = null;
+    // Try cloud if logged in
+    if(user && user.uid){
+      d = await fbLoad(user.uid);
+      if(d) lsSet(d); // cache locally
+    }
+    if(!d) d=dbGet();
+    if(!d){const ns={...INIT,lastDate:today,lastResetDate:today};dbSet(ns);setS(ns);return;}
+    if(!Array.isArray(d.habits))      d.habits=DEF_HABITS;
+    if(!d.checkedHabits)              d.checkedHabits={};
+    if(!d.recurringQuests)            d.recurringQuests=INIT.recurringQuests;
+    if(!d.rescueList)                 d.rescueList=DEF_RESCUE;
+    if(d.rescueThreshold===undefined) d.rescueThreshold=60;
+    if(!d.bigEvents)                  d.bigEvents=[];
+    if(!d.badges)                     d.badges=[];
+    if(!d.dayColors)                  d.dayColors={};
+    if(!d.daySummaries)               d.daySummaries={};
+    if(!d.motto)                      d.motto="生活是一场冒险，每天都是新的探索 🌿";
+    if(!d.eventTags)                  d.eventTags=["担心","开心","感恩","反思","突破"];
+    if(!d.lastWeeklySettleDate)       d.lastWeeklySettleDate="";
+    if(d.pendingWeeklyResult===undefined) d.pendingWeeklyResult=null;
+    // Migrate longStats: add growth if missing
+    if(!d.longStats.growth)           d.longStats={...d.longStats,growth:{label:"成长",icon:"📚",value:60,color:"#8B5CF6"}};
+    // Migrate habits: ensure weeklyBonus.stats array + weeklyTarget
+    d.habits=d.habits.map(h=>{
+      if(h.longBonus!==undefined&&h.weeklyBonus===undefined){
+        const lb=h.longBonus||{};
+        const firstStat=Object.keys(lb)[0]||"";
+        h={...h,weeklyBonus:{stats:firstStat?[firstStat]:[]},weeklyTarget:5};
+        delete h.longBonus;
+      }
+      return migrateWeeklyBonus(h);
+    });
+    // Add focus habit if missing
+    if(!d.habits.find(h=>h.id==="focus")){
+      d.habits=[...d.habits,{id:"focus",label:"专注",icon:"🎯",weeklyBonus:{stats:["growth"]},weeklyTarget:4,shortBonus:{mood:5}}];
+    }
+
+    const h=nowHour();
+    const resetDay=h>=5?today:(()=>{const dt=new Date();dt.setDate(dt.getDate()-1);return dt.toLocaleDateString("zh-CN",{year:"numeric",month:"2-digit",day:"2-digit"});})();
+    if(d.lastResetDate!==resetDay){
+      const snap={date:d.lastDate||d.lastResetDate,long:d.longStats,short:d.shortStats,level:d.player.level,letter:d.letter};
+      const hist=[...(d.history||[]),snap].slice(-60);
+      const rs={};Object.keys(d.shortStats).forEach(k=>rs[k]={...d.shortStats[k],value:80});
+      d={...d,shortStats:rs,history:hist,lastDate:today,lastResetDate:resetDay};
+    } else if(d.lastDate!==today){d={...d,lastDate:today};}
+
+    // Check weekly settlement: trigger if it's Saturday (day 6) and not yet settled this week
+    const now=new Date();
+    const curWeekKey=getWeekKey(now);
+    if(now.getDay()===6&&d.lastWeeklySettleDate!==curWeekKey){
+      const{newLongStats,extraFlowers,gains}=runWeeklySettle(d.habits,d.checkedHabits,d.longStats);
+      d={...d,longStats:newLongStats,player:{...d.player,xp:d.player.xp+extraFlowers},
+         lastWeeklySettleDate:curWeekKey,
+         pendingWeeklyResult:{gains,flowers:extraFlowers}};
+    }
+
+    dbSet(d);setS(d);
+    }; // end initData
+    initData();
+  },[user]);
+
+  const save=useCallback(ns=>{setS(ns);dbSet(ns);},[]);
+  const pop=msg=>{setToast(msg);clearTimeout(popT.current);popT.current=setTimeout(()=>setToast(null),2600);};
+
+  // Auto-show weekly result popup once
+  useEffect(()=>{
+    if(s&&s.pendingWeeklyResult){setShowWeeklyResult(true);}
+  },[s?.pendingWeeklyResult]);
+
+  const lvUp=(xp,lv,xpN,badges)=>{
+    let nb=[...(badges||[])],latest=null;
+    while(xp>=xpN){lv++;xp-=xpN;xpN=100;const badge=grantBadge(lv,nb);nb.push(badge);latest=badge;}
+    return{xp,lv,xpN:100,newBadges:nb,latestBadge:latest};
+  };
+
+  const completeQuest=id=>{
+    const all=[...s.mainQuests,...s.sideQuests];const q=all.find(x=>x.id===id);if(!q||q.done)return;
+    const r=q.reward||{};
+    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+(r.xp||0),s.player.level,s.player.xpNext,s.badges);
+    if(s.player.level===lv)pop(`✅ 完成！${rwdTxt(r,s.longStats,s.shortStats)}`);
+    else{pop(`🎉 升级 Lv.${lv}！获得徽章！`);if(latestBadge)setNewBadge(latestBadge);}
+    save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
+      longStats:applyB(s.longStats,r.long||{}),shortStats:applyB(s.shortStats,r.short||{}),
+      mainQuests:s.mainQuests.map(q2=>q2.id===id?{...q2,done:true}:q2),
+      sideQuests:s.sideQuests.map(q2=>q2.id===id?{...q2,done:true}:q2),
+    });
+  };
+  const deleteQuest=id=>{
+    save({...s,mainQuests:s.mainQuests.filter(q=>q.id!==id),sideQuests:s.sideQuests.filter(q=>q.id!==id),recurringQuests:s.recurringQuests.filter(q=>q.id!==id)});
+    pop("🗑️ 已删除");
+  };
+  const completeRecurring=id=>{
+    const q=s.recurringQuests.find(x=>x.id===id);if(!q||!canDoR(q))return;
+    const r=q.reward||{};
+    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+(r.xp||0),s.player.level,s.player.xpNext,s.badges);
+    if(s.player.level===lv)pop(`✅ ${q.title} 完成！`);
+    else{pop(`🎉 升级 Lv.${lv}！获得徽章！`);if(latestBadge)setNewBadge(latestBadge);}
+    save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
+      longStats:applyB(s.longStats,r.long||{}),shortStats:applyB(s.shortStats,r.short||{}),
+      recurringQuests:s.recurringQuests.map(q2=>q2.id===id?{...q2,lastDone:new Date().toISOString()}:q2),
+    });
+  };
+  const toggleHabit=hid=>{
+    const today=todayKey(),th=s.checkedHabits[today]||{},was=!!th[hid];
+    const h=s.habits.find(x=>x.id===hid);if(!h)return;
+    let ns={...s,checkedHabits:{...s.checkedHabits,[today]:{...th,[hid]:!was}}};
+    if(!was){
+      // Apply short stats (capped at 100)
+      const sb=h.shortBonus||{};
+      const newShort={};
+      Object.keys(ns.shortStats).forEach(k=>{
+        const add=sb[k]||0;
+        newShort[k]={...ns.shortStats[k],value:Math.min(100,ns.shortStats[k].value+add)};
+      });
+      ns.shortStats=newShort;
+      // +1 flower (xp)
+      ns.player={...ns.player,xp:ns.player.xp+1};
+      pop(`${h.icon} ${h.label} 完成！🌸+1`);
+    } else {
+      // Undo short stats
+      const sb=h.shortBonus||{};
+      const newShort={};
+      Object.keys(ns.shortStats).forEach(k=>{
+        const sub=sb[k]||0;
+        newShort[k]={...ns.shortStats[k],value:Math.max(0,ns.shortStats[k].value-sub)};
+      });
+      ns.shortStats=newShort;
+      // -1 flower
+      ns.player={...ns.player,xp:Math.max(0,ns.player.xp-1)};
+    }
+    save(ns);
+  };
+  const saveHabit=draft=>{
+    if(!draft.label.trim())return;
+    const exists=s.habits.find(h=>h.id===draft.id);
+    save({...s,habits:exists?s.habits.map(h=>h.id===draft.id?draft:h):[...s.habits,{...draft,id:"h_"+Date.now()}]});
+    setModal(null);setHabEdit(null);pop("✏️ 已保存");
+  };
+  const deleteHabit=id=>{save({...s,habits:s.habits.filter(h=>h.id!==id)});setModal(null);setHabEdit(null);pop("🗑️ 已删除");};
+  const saveQuest=()=>{
+    if(!qForm.title.trim())return;
+    const reward={xp:Number(qForm.xp)||10,long:{...qForm.long},short:{...qForm.short}};
+    Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
+    Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
+    if(qForm.type==="recurring"){
+      save({...s,recurringQuests:[...s.recurringQuests,{id:"r_"+Date.now(),title:qForm.title,desc:qForm.desc,period:qForm.period||"weekly",reward,lastDone:""}]});
+    }else{
+      const q={id:Date.now(),title:qForm.title,desc:qForm.desc,reward,done:false};
+      save({...s,mainQuests:qForm.type==="main"?[...s.mainQuests,q]:s.mainQuests,sideQuests:qForm.type==="side"?[...s.sideQuests,q]:s.sideQuests});
+    }
+    setModal(null);setQForm(null);pop("📜 任务已接取");
+  };
+  const saveBigEvent=()=>{
+    if(!evForm.text.trim())return;
+    const evXp=Number(evForm.xp)||0;
+    const isEdit=!!evForm.id;
+    const lc={},sc={};
+    Object.keys(s.longStats).forEach(k=>{if(evForm.changes[k])lc[k]=evForm.changes[k];});
+    Object.keys(s.shortStats).forEach(k=>{if(evForm.changes[k])sc[k]=evForm.changes[k];});
+
+    if(isEdit){
+      // editing: just update text/tag/xp/changes, don't re-apply stat bonuses
+      const updatedEvents=s.bigEvents.map(ev=>ev.id===evForm.id
+        ?{...ev,text:evForm.text,xp:evXp,statChanges:evForm.changes,tag:evForm.tag||""}
+        :ev);
+      save({...s,bigEvents:updatedEvents});
+      pop("✏️ 大事已更新");
+    } else {
+      const ev={id:Date.now(),date:todayKey(),text:evForm.text,xp:evXp,statChanges:evForm.changes,tag:evForm.tag||""};
+      const{longStats:newLong,extraFlowers}=applyLongWithOverflow(s.longStats,lc);
+      let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+evXp+extraFlowers,s.player.level,s.player.xpNext,s.badges);
+      if(s.player.level===lv)pop("📝 大事已记录");
+      else{pop(`🎉 升级 Lv.${lv}！获得徽章！`);if(latestBadge)setNewBadge(latestBadge);}
+      save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,bigEvents:[...s.bigEvents,ev].slice(-200),longStats:newLong,shortStats:applyB(s.shortStats,sc)});
+    }
+    setModal(null);setEvForm(null);
+  };
+  const handleImport=d=>{
+    const merged={...INIT,...d,lastDate:todayKey(),lastResetDate:todayKey(),checkedHabits:d.checkedHabits||{},badges:d.badges||[],dayColors:d.dayColors||{},daySummaries:d.daySummaries||{},motto:d.motto||INIT.motto,eventTags:d.eventTags||INIT.eventTags,lastWeeklySettleDate:d.lastWeeklySettleDate||"",pendingWeeklyResult:null};
+    save(merged);pop("✅ 数据导入成功！");setShowSettings(false);
+  };
+
+  if(user===undefined||(!s&&user!==null))return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(180deg,#AEE6F8,#D4F0FF)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+      <div style={{animation:"float 2s ease-in-out infinite",fontSize:48}}>🌿</div>
+      <div style={{color:"#5BAF5F",fontSize:14,fontWeight:700,letterSpacing:2}}>小岛加载中…</div>
+    </div>
+  );
+  if(user===null&&!s) return <LoginScreen onLogin={u=>{setUser(u);_fbUid=u.uid;}}/>;
+
+  const today=todayKey(),th=s.checkedHabits[today]||{},doneCnt=s.habits.filter(h=>th[h.id]).length;
+  const xpPct=Math.min(100,(s.player.xp/s.player.xpNext)*100);
+  const lowMood=s.shortStats.mood?.value<s.rescueThreshold,lowEnergy=s.shortStats.energy?.value<s.rescueThreshold;
+  const showAlert=lowMood||lowEnergy;
+  const badges=s.badges||[];
+
+  const TABS=[["home","🌱","主页"],["quests","🌳","任务"],["habits","🌻","打卡"],["log","🍃","记录"]];
+
+  return(
+    <div style={{fontFamily:"'Nunito','Noto Sans SC','PingFang SC',sans-serif",background:"#E8F5E9",minHeight:"100vh",maxWidth:480,margin:"0 auto",color:"#3D2B1F"}}>
+
+      {/* toast */}
+      {toast&&<div style={{position:"fixed",top:"env(safe-area-inset-top,18px)",left:"50%",transform:"translateX(-50%)",background:"#5BAF5F",color:"#fff",padding:"10px 24px",borderRadius:28,fontSize:13,fontWeight:700,zIndex:999,whiteSpace:"nowrap",boxShadow:"0 6px 24px rgba(91,175,95,.45)",animation:"pop .25s ease"}}>{toast}</div>}
+
+      {/* weekly settlement result popup */}
+      {showWeeklyResult&&s.pendingWeeklyResult&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.6)",zIndex:160,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{setShowWeeklyResult(false);save({...s,pendingWeeklyResult:null});}}>
+          <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px",maxWidth:320,width:"92%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.25)",border:"3px solid #8B5CF6"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:32,marginBottom:4}}>🎊</div>
+            <div style={{fontSize:17,fontWeight:900,color:"#3D2B1F",marginBottom:4}}>本周结算完成！</div>
+            <div style={{fontSize:12,color:"#8B5CF6",fontWeight:700,marginBottom:14}}>每周六·属性成长结算</div>
+            {s.pendingWeeklyResult.gains.length===0
+              ?<div style={{fontSize:13,color:"#B09070",marginBottom:14}}>本周没有达到5天目标的打卡项 🌱</div>
+              :<div style={{marginBottom:14}}>
+                {s.pendingWeeklyResult.gains.map((g,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#F8F0FF",border:"1.5px solid #C9A8E8",borderRadius:12,padding:"8px 14px",marginBottom:6}}>
+                    <span style={{fontSize:14}}>{g.icon} {g.label}</span>
+                    <span style={{fontSize:13,fontWeight:800,color:"#8B5CF6"}}>{s.longStats[g.stat]?.icon||""}+1 {s.longStats[g.stat]?.label||g.stat}</span>
+                  </div>
+                ))}
+              </div>
+            }
+            {s.pendingWeeklyResult.flowers>0&&(
+              <div style={{background:"#F0FFF0",border:"2px solid #7BC67E",borderRadius:12,padding:"8px 14px",marginBottom:14,fontSize:13,fontWeight:700,color:"#3A7D3E"}}>
+                🌸 属性溢出奖励 +{s.pendingWeeklyResult.flowers} 花
+              </div>
+            )}
+            <button style={{...S.cfmBtn}} onClick={()=>{setShowWeeklyResult(false);save({...s,pendingWeeklyResult:null});}}>太棒了！继续加油 🌿</button>
+          </div>
+        </div>
+      )}
+
+      {/* badge popup */}
+      {newBadge&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:150,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setNewBadge(null)}>
+          <div style={{background:"#FFFDF5",borderRadius:28,padding:"32px 28px",maxWidth:300,width:"90%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.25)",border:"3px solid #7BC67E"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:28,marginBottom:4}}>🎉</div>
+            <div style={{fontSize:14,color:"#5BAF5F",fontWeight:700,marginBottom:4}}>升级啦！获得新徽章</div>
+            <div style={{display:"flex",justifyContent:"center",margin:"16px 0",animation:"badgePop .5s ease"}}>
+              <BadgeSVG name={newBadge.name} rarity={newBadge.rarity} size={90}/>
+            </div>
+            <div style={{fontSize:18,fontWeight:900,color:"#3D2B1F",marginBottom:6}}>{newBadge.name}</div>
+            <div style={{fontSize:12,color:RARITY_CFG[newBadge.rarity].text,background:RARITY_CFG[newBadge.rarity].bg,borderRadius:20,padding:"4px 14px",display:"inline-block",marginBottom:20,fontWeight:700,border:`1.5px solid ${RARITY_CFG[newBadge.rarity].border}`}}>
+              {RARITY_CFG[newBadge.rarity].star} {RARITY_CFG[newBadge.rarity].label}
+            </div>
+            <button style={S.cfmBtn} onClick={()=>setNewBadge(null)}>太棒了！🌿</button>
+          </div>
+        </div>
+      )}
+
+      {/* settings drawer */}
+      {showSettings&&(
+        <div style={S.overlay} onClick={()=>setShowSettings(false)}>
+          <div style={{...S.drawer,maxHeight:"92vh"}} onClick={e=>e.stopPropagation()}>
+            <div style={S.handle}/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <div style={{fontSize:17,fontWeight:900,color:"#3D2B1F"}}>⚙️ 岛屿设置</div>
+              <button style={{background:"#F5E6C8",border:"none",borderRadius:"50%",width:32,height:32,fontSize:16,cursor:"pointer",color:"#A86440"}} onClick={()=>setShowSettings(false)}>✕</button>
+            </div>
+            {user&&<div style={{background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:12,color:"#3A7D3E",flex:1,fontWeight:700}}>☁️ {user.email||user.displayName||"已登录"}</span>
+              <button onClick={async()=>{await window._fbSignOut(window._fbAuth);setUser(null);setS(null);setShowSettings(false);pop("👋 已退出登录");}} style={{fontSize:11,fontWeight:800,color:"#C0392B",background:"#FFF0EE",border:"2px solid #FFB3A8",borderRadius:10,padding:"5px 12px",cursor:"pointer"}}>退出</button>
+            </div>}
+            <div style={S.settingSection}>
+              <div style={S.cl}>🐚 角色设置</div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:13,color:"#7A5C44",minWidth:52,fontWeight:700}}>岛主名</span>
+                <input style={{...S.inp,marginBottom:0,flex:1}} value={s.player.name} onChange={e=>save({...s,player:{...s.player,name:e.target.value}})}/>
+              </div>
+            </div>
+            <div style={S.settingSection}>
+              <div style={S.cl}>🎲 充能抽签库</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                <span style={{fontSize:12,color:"#7A5C44",fontWeight:700}}>触发阈值</span>
+                <input type="number" min="0" max="100" style={{...S.inp,width:72,marginBottom:0}} value={s.rescueThreshold} onChange={e=>save({...s,rescueThreshold:Number(e.target.value)||60})}/>
+                <span style={{fontSize:11,color:"#B09070"}}>低于此值时提醒</span>
+              </div>
+              {s.rescueList.map((item,i)=>(
+                <div key={i} style={S.settingRow}>
+                  <span style={{flex:1,fontSize:13}}>{item}</span>
+                  <button style={S.xBtn} onClick={()=>{const nl=[...s.rescueList];nl.splice(i,1);save({...s,rescueList:nl});pop("🗑️ 已删除");}}>🗑</button>
+                </div>
+              ))}
+              <RescueAdd onAdd={txt=>{if(txt.trim()){save({...s,rescueList:[...s.rescueList,txt.trim()]});pop("✅ 已添加");}}}/>
+            </div>
+            <div style={S.settingSection}>
+              <div style={S.cl}>💾 数据管理</div>
+              <div style={{fontSize:12,color:"#B09070",marginBottom:10}}>包含徽章、大事记录、历史记录等全部数据</div>
+              <button style={{...S.cfmBtn,marginBottom:10}} onClick={()=>exportData(s)}>📤 导出数据备份</button>
+              <button style={{...S.cfmBtn,background:"linear-gradient(135deg,#70B8E0,#5BAF5F)"}} onClick={()=>importRef.current?.click()}>📥 导入数据</button>
+              <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={e=>{if(!e.target.files[0])return;importData(e.target.files[0],handleImport,err=>pop(`❌ 导入失败：${err}`));e.target.value="";}}/>
+              <div style={{fontSize:11,color:"#B09070",marginTop:8,textAlign:"center"}}>导入将覆盖现有数据，请先导出备份</div>
+            </div>
+            <div style={{height:20}}/>
+          </div>
+        </div>
+      )}
+
+      {/* AC header scene */}
+      <HeaderScene
+        playerName={s.player.name}
+        level={s.player.level}
+        xpPct={xpPct}
+        xp={s.player.xp}
+        xpNext={s.player.xpNext}
+        doneCnt={doneCnt}
+        totalHabits={s.habits.length}
+        habits={s.habits}
+        th={th}
+        onGear={()=>setShowSettings(true)}
+      />
+
+      {/* tab bar */}
+      <div style={{display:"flex",background:"#FFFDF5",borderTop:"3px solid #A8D8A8",borderBottom:"2px solid #D4EED4",position:"sticky",top:0,zIndex:10,boxShadow:"0 2px 12px rgba(91,175,95,.12)"}}>
+        {TABS.map(([k,icon,l])=>(
+          <button key={k} className={tab===k?"tab-active":""} style={{flex:1,padding:"11px 2px 8px",background:"none",border:"none",color:tab===k?"#5BAF5F":"#B09070",fontSize:11,fontWeight:tab===k?900:600,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"all .2s"}} onClick={()=>setTab(k)}>
+            <span style={{fontSize:18,lineHeight:1}}>{icon}</span>
+            <span>{l}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* body */}
+      <div style={{padding:"14px 14px 0"}}>
+
+        {/* ── 主页 ── */}
+        {tab==="home"&&<>
+          {showAlert&&(
+            <div style={{background:"linear-gradient(135deg,#FFF8DC,#FFF3C4)",border:"2.5px solid #FFD166",borderRadius:20,padding:"14px 16px",marginBottom:12,boxShadow:"0 4px 16px rgba(255,209,102,.3)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:22}}>🍂</span>
+                <span style={{flex:1,fontSize:13,fontWeight:700,color:"#A06000"}}>{[lowMood&&"心情",lowEnergy&&"体力"].filter(Boolean).join("、")} 偏低，需要充充电！</span>
+                <button style={{background:"#FFD166",border:"none",color:"#7A4A00",borderRadius:14,padding:"7px 16px",fontSize:12,fontWeight:900,cursor:"pointer",boxShadow:"0 2px 8px rgba(255,209,102,.5)"}} onClick={()=>setModal("rescue")}>抽签</button>
+              </div>
+            </div>
+          )}
+          {/* long stats */}
+          <ACCard title="🌱 长期成长属性">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {Object.entries(s.longStats).map(([k,st])=>(
+                <div key={k} style={{background:"linear-gradient(145deg,#F8FFF8,#EEF8EE)",borderRadius:16,padding:"12px 10px",cursor:"pointer",border:"2px solid #C8E8C8",boxShadow:"0 2px 8px rgba(91,175,95,.1)"}} onClick={()=>{setEvForm({text:"",xp:0,changes:{}});setModal("bigEvent");}}>
+                  <div style={{fontSize:20,marginBottom:4}}>{st.icon}</div>
+                  <div style={{fontSize:10,color:"#7A5C44",fontWeight:700,marginBottom:2}}>{st.label}</div>
+                  <div style={{fontSize:26,fontWeight:900,lineHeight:1,marginBottom:6,color:st.color}}>{st.value}</div>
+                  <div style={{height:5,background:"#D4EED4",borderRadius:3,overflow:"hidden"}}>
+                    <div style={{height:"100%",borderRadius:3,background:st.color,width:`${st.value}%`,transition:"width .4s"}}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>点击属性 → 记录大事并调整数值</div>
+          </ACCard>
+          {/* short stats */}
+          <ACCard title="☀️ 今日状态">
+            <div style={{display:"flex",gap:10}}>
+              {Object.entries(s.shortStats).map(([k,st])=>{
+                const low=st.value<s.rescueThreshold;
+                return(
+                  <div key={k} style={{flex:1,background:low?"linear-gradient(145deg,#FFFBDC,#FFF7C4)":"linear-gradient(145deg,#F8FFF8,#EEFFF0)",borderRadius:16,padding:"14px 12px",border:`2px solid ${low?"#FFD166":"#C8E8C8"}`,cursor:"pointer",boxShadow:low?"0 2px 10px rgba(255,209,102,.25)":"0 2px 8px rgba(91,175,95,.1)"}} onClick={()=>{setEvForm({text:"",xp:0,changes:{}});setModal("bigEvent");}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                      <span style={{fontSize:16}}>{st.icon}</span>
+                      <span style={{fontSize:11,color:"#7A5C44",fontWeight:700}}>{st.label}</span>
+                    </div>
+                    <div style={{fontSize:30,fontWeight:900,lineHeight:1,marginBottom:8,color:st.color}}>{st.value}</div>
+                    <div style={{height:5,background:"#D4EED4",borderRadius:3,overflow:"hidden"}}>
+                      <div style={{height:"100%",borderRadius:3,background:st.color,width:`${st.value}%`,transition:"width .4s"}}/>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:6}}>每天 05:00 重置为80</div>
+          </ACCard>
+          {/* rescue quick action */}
+          <div style={{display:"flex",gap:10,marginBottom:12}}>
+            <button style={{flex:1,background:"linear-gradient(135deg,#FFF8E8,#FFF3C4)",border:"2.5px solid #FFD166",borderRadius:18,padding:"14px 10px",cursor:"pointer",boxShadow:"0 4px 14px rgba(255,209,102,.25)",textAlign:"center"}} onClick={()=>setModal("rescue")}>
+              <div style={{fontSize:24,marginBottom:4}}>🎲</div>
+              <div style={{fontSize:12,fontWeight:800,color:"#A06000"}}>充能抽签</div>
+            </button>
+            <button style={{flex:1,background:"linear-gradient(135deg,#F0FFF0,#E8FFF0)",border:"2.5px solid #7BC67E",borderRadius:18,padding:"14px 10px",cursor:"pointer",boxShadow:"0 4px 14px rgba(123,198,126,.2)",textAlign:"center"}} onClick={()=>{setEvForm({text:"",xp:0,changes:{},tag:""});setModal("bigEvent");}}>
+              <div style={{fontSize:24,marginBottom:4}}>📝</div>
+              <div style={{fontSize:12,fontWeight:800,color:"#3A7D3E"}}>记录大事</div>
+            </button>
+          </div>
+          {/* motto */}
+          <ACCard title="🍃 座右铭" action={
+            <button style={S.editTxtBtn} onClick={()=>{setMottoD(s.motto||"");setEditingMotto(true);}}>编辑</button>
+          }>
+            {editingMotto
+              ?<div>
+                <textarea style={{...S.inp,height:72,resize:"none",lineHeight:1.65,marginBottom:8}} value={mottoD} onChange={e=>setMottoD(e.target.value)} autoFocus/>
+                <div style={{display:"flex",gap:8}}>
+                  <button style={{...S.cfmBtn,flex:1,padding:"10px"}} onClick={()=>{save({...s,motto:mottoD});setEditingMotto(false);pop("🍃 座右铭已更新");}}>保存</button>
+                  <button style={{...S.dBtn,padding:"10px 16px"}} onClick={()=>setEditingMotto(false)}>取消</button>
+                </div>
+              </div>
+              :<div style={{fontSize:15,color:"#3D2B1F",lineHeight:1.75,fontWeight:700,background:"#F8FFF8",borderRadius:14,padding:"12px 16px",border:"2px dashed #C8E8C8",fontStyle:"italic"}}>{s.motto||"点击「编辑」添加你的座右铭 🌿"}</div>
+            }
+          </ACCard>
+        </>}
+
+        {/* ── 任务 ── */}
+        {tab==="quests"&&<>
+          {[["main","🌳 种树任务",s.mainQuests],["side","🗺️ 探索任务",s.sideQuests]].map(([type,label,list])=>(
+            <ACCard key={type} title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:type==="main"?20:5,period:"weekly",long:{},short:{}});setModal("quest");}}>＋ 新增</button>}>
+              {list.length===0&&<div style={S.empty}>暂无任务，去冒险吧！</div>}
+              {list.map(q=>(
+                <div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3",opacity:q.done?.45:1}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:q.done?"#B09070":"#3D2B1F"}}>{q.done?"✅ ":"🔸 "}{q.title}</div>
+                    {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
+                    <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
+                  </div>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    {!q.done&&<button style={S.dBtn} onClick={()=>completeQuest(q.id)}>完成</button>}
+                    <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
+                  </div>
+                </div>
+              ))}
+            </ACCard>
+          ))}
+          <ACCard title="🌸 浇水任务" action={<button style={S.plusBtn} onClick={()=>{setQForm({type:"recurring",title:"",desc:"",xp:5,period:"weekly",long:{},short:{}});setModal("quest");}}>＋ 新增</button>}>
+            {s.recurringQuests.length===0&&<div style={S.empty}>添加每周/每月浇水任务吧！</div>}
+            {s.recurringQuests.map(q=>{
+              const ok=canDoR(q);
+              return<div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3",opacity:ok?1:.5}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:800,marginBottom:3}}>{ok?"🔄 ":"✅ "}{q.title}</div>
+                  <div style={{fontSize:10,color:"#B09070",marginBottom:2}}>{q.period==="weekly"?"每周":"每月"}</div>
+                  {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
+                  <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  {ok&&<button style={S.dBtn} onClick={()=>completeRecurring(q.id)}>完成</button>}
+                  <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
+                </div>
+              </div>;
+            })}
+          </ACCard>
+        </>}
+
+        {/* ── 打卡 ── */}
+        {tab==="habits"&&(
+          <>
+          {/* 今日打卡 FIRST */}
+          <ACCard title="🌻 今日打卡" action={<button style={S.plusBtn} onClick={()=>{setHabEdit({id:"",label:"",icon:"⭐",weeklyBonus:{stats:[]},weeklyTarget:5,shortBonus:{}});setModal("habit");}}>＋ 新增</button>}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+              {s.habits.map(h=>{
+                const done=!!th[h.id];
+                const wbStats=(h.weeklyBonus?.stats||[]).filter(k=>s.longStats[k]);
+                const target=h.weeklyTarget||5;
+                const weekCnt=countWeekChecks(s.checkedHabits,h.id);
+                return<div key={h.id} style={{position:"relative"}}>
+                  <button style={{position:"relative",background:done?"linear-gradient(145deg,#C8F0C8,#A8E8B8)":"linear-gradient(145deg,#FFFDF5,#FFF8EC)",border:`2.5px solid ${done?"#7BC67E":"#EDD9A3"}`,borderRadius:20,padding:"16px 12px 12px",textAlign:"center",width:"100%",cursor:"pointer",boxShadow:done?"0 4px 16px rgba(123,198,126,.3)":"0 2px 8px rgba(180,140,80,.1)",transition:"all .25s"}} onClick={()=>toggleHabit(h.id)}>
+                    {done&&<div style={{position:"absolute",top:10,right:12,color:"#5BAF5F",fontWeight:900,fontSize:14}}>✓</div>}
+                    <div style={{fontSize:26,marginBottom:6}}>{h.icon}</div>
+                    <div style={{fontSize:13,fontWeight:800,marginBottom:4,color:done?"#3A7D3E":"#3D2B1F"}}>{h.label}</div>
+                    <div style={{fontSize:10,color:done?"#5BAF5F":"#B09070",marginBottom:3}}>
+                      {Object.entries(h.shortBonus||{}).map(([k,v])=>{const st=s.shortStats[k];return<span key={k}>{st?.icon}+{v} </span>;})}
+                    </div>
+                    {wbStats.length>0&&<div style={{fontSize:9,color:"#8B5CF6",background:"#F8F0FF",borderRadius:6,padding:"2px 6px",display:"inline-block"}}>
+                      周:{weekCnt}/{target} {wbStats.map(k=>s.longStats[k]?.icon).join("")}
+                    </div>}
+                  </button>
+                  <button style={{position:"absolute",top:9,right:done?30:10,background:"none",border:"none",fontSize:13,padding:2,opacity:.45,cursor:"pointer"}} onClick={e=>{e.stopPropagation();setHabEdit({...h});setModal("habit");}}>✏️</button>
+                </div>;
+              })}
+            </div>
+            <div style={{height:8,background:"#D4EED4",borderRadius:4,overflow:"hidden"}}>
+              <div style={{height:"100%",background:"linear-gradient(90deg,#7BC67E,#5BAF5F)",borderRadius:4,width:`${s.habits.length?(doneCnt/s.habits.length)*100:0}%`,transition:"width .4s"}}/>
+            </div>
+            <div style={{fontSize:12,color:"#7A5C44",textAlign:"center",marginTop:8,fontWeight:700}}>今日进度 {doneCnt} / {s.habits.length} 🌿</div>
+          </ACCard>
+
+          {/* 本周进度 SECOND */}
+          <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📅 本周进度</div>
+              <div style={{fontSize:11,color:"#8B5CF6",fontWeight:800,background:"#F8F0FF",borderRadius:12,padding:"3px 10px",border:"1.5px solid #C9A8E8"}}>
+                {s.habits.filter(h=>countWeekChecks(s.checkedHabits,h.id)>=(h.weeklyTarget||5)).length}/{s.habits.length} 项达标
+              </div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {s.habits.map(h=>{
+                const target=h.weeklyTarget||5;
+                const cnt=countWeekChecks(s.checkedHabits,h.id);
+                const pct=Math.min(100,(cnt/target)*100);
+                const done=cnt>=target;
+                const wbStats=(h.weeklyBonus?.stats||[]).filter(k=>s.longStats[k]);
+                return(
+                  <div key={h.id}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                      <span style={{fontSize:14,width:20}}>{h.icon}</span>
+                      <span style={{flex:1,fontSize:12,fontWeight:700,color:"#3D2B1F"}}>{h.label}</span>
+                      {wbStats.length>0&&<span style={{fontSize:10,color:"#8B5CF6",background:"#F8F0FF",borderRadius:8,padding:"2px 7px",border:"1.5px solid #C9A8E8",fontWeight:700}}>
+                        周奖：{wbStats.map(k=>s.longStats[k]?.icon+""+s.longStats[k]?.label+"+1").join(" ")}
+                      </span>}
+                      <span style={{fontSize:11,fontWeight:800,color:done?"#5BAF5F":"#B09070",minWidth:36,textAlign:"right"}}>{cnt}/{target}</span>
+                    </div>
+                    <div style={{height:5,background:"#D4EED4",borderRadius:3,overflow:"hidden"}}>
+                      <div style={{height:"100%",borderRadius:3,background:done?"linear-gradient(90deg,#7BC67E,#5BAF5F)":"linear-gradient(90deg,#C9A8E8,#8B5CF6)",width:`${pct}%`,transition:"width .4s"}}/>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:10,color:"#B09070",marginTop:10,textAlign:"center"}}>完成目标次数 → 周六自动结算长期属性 🌸</div>
+          </div>
+          </>
+        )}
+
+        {/* ── 记录 ── */}
+        {tab==="log"&&<>
+          {/* badge collection */}
+          <ACCard title="🏅 徽章收藏" action={<span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{badges.length} 枚</span>}>
+            {badges.length===0
+              ?<div style={S.empty}>升级后将获得世界景点徽章 🌍<br/><span style={{fontSize:11}}>每100🌸升一级</span></div>
+              :<BadgeCollection badges={badges}/>
+            }
+          </ACCard>
+
+          {/* 每日记录 FIRST */}
+          <HistoryCard
+            history={s.history}
+            dayColors={s.dayColors||{}}
+            daySummaries={s.daySummaries||{}}
+            today={today}
+            todaySnap={{date:today,long:s.longStats,short:s.shortStats,level:s.player.level}}
+            onPickColor={(dateKey,color)=>save({...s,dayColors:{...(s.dayColors||{}),[dateKey]:color}})}
+            onSaveSummary={(dateKey,text)=>save({...s,daySummaries:{...(s.daySummaries||{}),[dateKey]:text}})}
+          />
+
+          {/* 大事记录 SECOND */}
+          <BigEventsCard
+            events={s.bigEvents}
+            eventTags={s.eventTags||[]}
+            longStats={s.longStats}
+            shortStats={s.shortStats}
+            onAdd={()=>{setEvForm({text:"",xp:0,changes:{},tag:""});setModal("bigEvent");}}
+            onEdit={(ev)=>{setEvForm({id:ev.id,text:ev.text,xp:ev.xp||0,changes:ev.statChanges||{},tag:ev.tag||""});setModal("bigEvent");}}
+            onDeleteTag={tag=>save({...s,eventTags:(s.eventTags||[]).filter(t=>t!==tag)})}
+            onAddTag={tag=>{if(tag&&!(s.eventTags||[]).includes(tag))save({...s,eventTags:[...(s.eventTags||[]),tag]});}}
+          />
+        </>}
+
+        <div style={{height:60}}/>
+      </div>
+
+      {/* modals */}
+      {modal==="rescue"&&(
+        <Drawer onClose={()=>setModal(null)}>
+          <div style={S.dH}>🎯 充能建议</div>
+          {s.rescueList.length===0?<div style={S.empty}>去「设置」添加充能建议吧</div>:(
+            <div style={{textAlign:"center",padding:"16px 0 8px"}}>
+              <button style={S.cfmBtn} onClick={()=>setDrawn(s.rescueList[Math.floor(Math.random()*s.rescueList.length)])}>🎲 {drawn?"再抽一次":"立刻抽签"}</button>
+              {drawn&&<div style={{fontSize:18,fontWeight:800,color:"#5BAF5F",marginTop:16,animation:"fadeSlideUp .3s ease"}}>✨ 建议你：{drawn}</div>}
+            </div>
+          )}
+          <div style={{textAlign:"center",marginTop:14}}>
+            <button style={{...S.dBtn,fontSize:12,padding:"8px 18px"}} onClick={()=>{setModal(null);setShowSettings(true);}}>⚙️ 编辑抽签库</button>
+          </div>
+        </Drawer>
+      )}
+
+      {modal==="quest"&&qForm&&(
+        <Drawer onClose={()=>{setModal(null);setQForm(null);}}>
+          <div style={S.dH}>接取新任务 🌱</div>
+          <div style={S.tog}>
+            {[["main","🌳 种树"],["side","🗺️ 探索"],["recurring","🌸 浇水"]].map(([t,l])=>(
+              <button key={t} style={{...S.tBtn,...(qForm.type===t?S.tOn:{})}} onClick={()=>setQForm(p=>({...p,type:t}))}>{l}</button>
+            ))}
+          </div>
+          {qForm.type==="recurring"&&<div style={S.tog}>
+            {[["weekly","每周"],["monthly","每月"]].map(([t,l])=>(
+              <button key={t} style={{...S.tBtn,...(qForm.period===t?S.tOn:{})}} onClick={()=>setQForm(p=>({...p,period:t}))}>{l}</button>
+            ))}
+          </div>}
+          <FL>任务名称</FL>
+          <input style={S.inp} placeholder="例：完成项目" value={qForm.title} onChange={e=>setQForm(p=>({...p,title:e.target.value}))}/>
+          <FL>描述（可选）</FL>
+          <input style={S.inp} placeholder="例：本月完成" value={qForm.desc} onChange={e=>setQForm(p=>({...p,desc:e.target.value}))}/>
+          <FL>🌸 奖励</FL>
+          <input type="number" style={{...S.inp,width:90}} value={qForm.xp} onChange={e=>setQForm(p=>({...p,xp:e.target.value}))}/>
+          <FL>长期属性加成</FL>
+          <BonusRow stats={s.longStats} bonus={qForm.long} onChange={b=>setQForm(p=>({...p,long:b}))}/>
+          <FL>今日属性加成</FL>
+          <BonusRow stats={s.shortStats} bonus={qForm.short} onChange={b=>setQForm(p=>({...p,short:b}))}/>
+          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveQuest}>确认接取 🌿</button>
+        </Drawer>
+      )}
+
+      {modal==="bigEvent"&&evForm&&(
+        <Drawer onClose={()=>{setModal(null);setEvForm(null);}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div style={S.dH}>{evForm.id?"✏️ 编辑大事":"📝 记录一件大事"}</div>
+            {evForm.id&&<button style={{...S.xBtn,fontSize:12,padding:"6px 12px"}} onClick={()=>{save({...s,bigEvents:s.bigEvents.filter(e=>e.id!==evForm.id)});setModal(null);setEvForm(null);pop("🗑️ 已删除");}}>删除</button>}
+          </div>
+          <FL>类型标签</FL>
+          <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:10}}>
+            <button
+              style={{fontSize:12,fontWeight:700,borderRadius:18,padding:"5px 14px",border:"2px solid #EDD9A3",background:evForm.tag===""?"#FFFDF5":"#F0FFF0",color:evForm.tag===""?"#B09070":"#3A7D3E",cursor:"pointer"}}
+              onClick={()=>setEvForm(p=>({...p,tag:""}))}>
+              无标签
+            </button>
+            {(s.eventTags||[]).map(t=>(
+              <button key={t}
+                style={{fontSize:12,fontWeight:700,borderRadius:18,padding:"5px 14px",border:`2px solid ${evForm.tag===t?"#5BAF5F":"#C8E8C8"}`,background:evForm.tag===t?"#5BAF5F":"#F0FFF0",color:evForm.tag===t?"#fff":"#3A7D3E",cursor:"pointer",transition:"all .15s"}}
+                onClick={()=>setEvForm(p=>({...p,tag:evForm.tag===t?"":t}))}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <FL>发生了什么</FL>
+          <textarea style={{...S.inp,height:88,resize:"none",lineHeight:1.65}} placeholder="记录下这件事…" value={evForm.text} onChange={e=>setEvForm(p=>({...p,text:e.target.value}))}/>
+          <FL>🌸 奖励（0 = 无）</FL>
+          <input type="number" min="0" max="999" style={{...S.inp,width:90}} value={evForm.xp} onChange={e=>setEvForm(p=>({...p,xp:e.target.value}))}/>
+          <FL>属性影响（正数增加，负数减少）</FL>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:8}}>
+            {[...Object.entries(s.longStats),...Object.entries(s.shortStats)].map(([k,st])=>(
+              <div key={k} style={S.bonusItem}>
+                <span style={{fontSize:15}}>{st.icon}</span>
+                <span style={{fontSize:11,color:"#7A5C44",fontWeight:700}}>{st.label}</span>
+                <input type="number" min="-99" max="99" style={S.nudgeInp} value={evForm.changes[k]||""} placeholder="0"
+                  onChange={e=>{const v=Number(e.target.value);const nc={...evForm.changes};v!==0?nc[k]=v:delete nc[k];setEvForm(p=>({...p,changes:nc}));}}/>
+              </div>
+            ))}
+          </div>
+          <button style={{...S.cfmBtn,marginTop:8}} onClick={saveBigEvent}>记录并应用</button>
+        </Drawer>
+      )}
+
+      {modal==="habit"&&habEdit&&(
+        <Drawer onClose={()=>{setModal(null);setHabEdit(null);}}>
+          <HabitEditor habit={habEdit} longStats={s.longStats} shortStats={s.shortStats} onSave={saveHabit} onDelete={habEdit.id?()=>deleteHabit(habEdit.id):null}/>
+        </Drawer>
+      )}
+    </div>
+  );
+}
+
+// ─── history card with color picker + summary ─────────────
+const DAY_PALETTE = [
+  // row 1 – greens: light → dark
+  "#F0FFF4","#D8FFD0","#C8F0A8","#B8F5C8","#A8E6A3","#7BC67E","#5BAF5F","#3A8F3E","#2D7A32","#1A5C22",
+  // row 2 – blues: light → dark
+  "#E0F0FF","#D4F0FF","#C8E8FF","#B8D8F8","#AEE6F8","#A8C8F0","#7DD4F0","#7BAAE0","#4A8FD0","#2E6BB0",
+  // row 3 – yellows: light → dark
+  "#FFFBDC","#FFF9C4","#FFF3C4","#FFF0A8","#FFE8A8","#FFE4C4","#FFD166","#FFBB50","#F0A030","#D88020",
+  // row 4 – oranges: light → dark
+  "#FFE4D0","#FFD0B8","#FFCBA8","#FFC8A8","#FFBB88","#FFA880","#FF9A5C","#FF8860","#FF7B3E","#E05A20",
+  // row 5 – pinks/roses: light → dark
+  "#FFE8EC","#FFD0D8","#FFC8D4","#FFB8C8","#FFB3C6","#FF9EB5","#FF8FAA","#FF7898","#FF6B8A","#E8456A",
+  // row 6 – purples: light → dark
+  "#F8E8FF","#EDD4F8","#E8D0FF","#D8B8FF","#C9A8E8","#C8A0F0","#B888E0","#B088D8","#9060C0","#7040A8",
+  // row 7 – lavenders: light → dark
+  "#F0F4FF","#EEF0FF","#E0E8FF","#D8D8F8","#D0D8FF","#C0C8F8","#B8B8F0","#B0B8F0","#9898E0","#5858A8",
+  // row 8 – sands/earths: light → dark
+  "#FFF8F0","#FFE8D0","#F5E6C8","#F0D8B8","#EDD9A3","#E0C8A0","#D4B896","#D0B888","#C8A880","#A88060",
+  // row 9 – rose/mauve: light → dark
+  "#FFF0F0","#FFE8E8","#F8D8D8","#F8C8C8","#E8B8B8","#F0B0B0","#E89898","#D89898","#C87878","#A85858",
+  // row 10 – greys: light → dark
+  "#FFFFFF","#F8F8F8","#F0F4F8","#E0E8F0","#D8E8F0","#C8D8E8","#B0C0D0","#98A8B8","#7888A0","#384858",
+];
+
+// luminance-based text color
+const textOnBg=hex=>{
+  if(!hex)return"#7A5C44";
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return(r*299+g*587+b*114)/1000>158?"#3D2B1F":"#fff";
+};
+
+function DayEntry({h,isToday,bg,summary,onPickColor,onSaveSummary}){
+  const [pickerOpen,setPickerOpen]=useState(false);
+  const [editingSum,setEditingSum]=useState(false);
+  const [sumDraft,setSumDraft]=useState(summary||"");
+  const tc=textOnBg(bg);
+  const chipLongBg  = bg?tc+"18":"#F0FFF0";
+  const chipLongBd  = bg?tc+"44":"#A8D8A8";
+  const chipLongTx  = bg?tc:"#3A7D3E";
+  const chipShortBg = bg?tc+"18":"#FFF8E8";
+  const chipShortBd = bg?tc+"44":"#EDD9A3";
+  const chipShortTx = bg?tc:"#A06000";
+
+  return(
+    <div style={{
+      borderRadius:18,
+      background:bg||"#FAFFF8",
+      border:`2.5px solid ${bg||"#D4EED4"}`,
+      marginBottom:10,
+      overflow:"hidden",
+      boxShadow:bg?`0 4px 16px ${bg}66`:"0 2px 8px rgba(90,60,30,.07)",
+      transition:"background .3s,border .3s",
+    }}>
+      {/* ── row 1: date + color dot ── */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 14px 0"}}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          {isToday&&<span style={{fontSize:10,fontWeight:900,background:"rgba(123,198,126,.25)",color:bg?tc:"#3A7D3E",borderRadius:10,padding:"2px 7px",border:`1px solid ${bg?tc+"44":"#A8D8A8"}`}}>今天</span>}
+          <span style={{fontSize:11,fontWeight:900,color:bg?tc:"#7A5C44"}}>{h.date} · Lv.{h.level}</span>
+        </div>
+        <button
+          onClick={()=>setPickerOpen(o=>!o)}
+          title="选择色块颜色"
+          style={{
+            width:26,height:26,borderRadius:"50%",
+            background:bg||"#E8F5E8",
+            border:`2.5px solid ${bg?tc+"66":"#A8D8A8"}`,
+            cursor:"pointer",flexShrink:0,
+            boxShadow:pickerOpen?`0 0 0 3px ${bg||"#7BC67E"}55`:"none",
+            transition:"box-shadow .2s",
+          }}
+        />
+      </div>
+
+      {/* ── color palette (10×10) ── */}
+      {pickerOpen&&(
+        <div style={{padding:"10px 14px 4px",animation:"fadeSlideUp .2s ease"}}>
+          <div style={{fontSize:10,fontWeight:700,color:bg?tc+"aa":"#B09070",marginBottom:8}}>🎨 选择今天的颜色</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:4,marginBottom:8}}>
+            {DAY_PALETTE.map(c=>(
+              <button key={c} onClick={()=>{onPickColor(c);setPickerOpen(false);}}
+                style={{
+                  width:"100%",aspectRatio:"1",borderRadius:6,
+                  background:c,
+                  border:`2px solid ${bg===c?"#3D2B1F":"rgba(0,0,0,.08)"}`,
+                  cursor:"pointer",outline:"none",
+                }}
+              />
+            ))}
+          </div>
+          {bg&&(
+            <button onClick={()=>{onPickColor("");setPickerOpen(false);}}
+              style={{fontSize:11,color:tc,background:"none",border:"none",cursor:"pointer",fontWeight:700,textDecoration:"underline",opacity:.7}}>
+              清除颜色
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── row 2: one-line summary ── */}
+      <div style={{padding:"8px 14px 0"}}>
+        {editingSum
+          ?<div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <input
+              autoFocus
+              style={{flex:1,background:"rgba(255,255,255,.6)",border:`1.5px solid ${bg?tc+"55":"#C8E8C8"}`,borderRadius:10,padding:"7px 10px",fontSize:13,color:bg?tc:"#3D2B1F",outline:"none",fontFamily:"inherit"}}
+              value={sumDraft}
+              placeholder="用一句话描述今天…"
+              onChange={e=>setSumDraft(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter"){onSaveSummary(sumDraft);setEditingSum(false);}if(e.key==="Escape")setEditingSum(false);}}
+              maxLength={60}
+            />
+            <button onClick={()=>{onSaveSummary(sumDraft);setEditingSum(false);}}
+              style={{background:"rgba(255,255,255,.5)",border:`1.5px solid ${bg?tc+"55":"#A8D8A8"}`,borderRadius:10,padding:"7px 10px",fontSize:12,fontWeight:800,color:bg?tc:"#3A7D3E",cursor:"pointer"}}>
+              ✓
+            </button>
+          </div>
+          :<div onClick={()=>{setSumDraft(summary||"");setEditingSum(true);}} style={{
+            fontSize:13,fontWeight:700,
+            color:bg?tc:(summary?"#3D2B1F":"#C8A880"),
+            fontStyle:summary?"normal":"italic",
+            cursor:"text",
+            padding:"3px 2px",
+            minHeight:24,
+          }}>
+            {summary||"✏️ 点击添加一句话总结…"}
+          </div>
+        }
+      </div>
+
+      {/* ── row 3: stat chips ── */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,padding:"8px 14px 12px"}}>
+        {Object.entries(h.long||{}).map(([k,st])=>(
+          <span key={k} style={{background:chipLongBg,border:`1.5px solid ${chipLongBd}`,color:chipLongTx,borderRadius:20,padding:"4px 10px",fontSize:12,fontWeight:700}}>
+            {st.icon}{st.value}
+          </span>
+        ))}
+        {Object.entries(h.short||{}).map(([k,st])=>(
+          <span key={k} style={{background:chipShortBg,border:`1.5px solid ${chipShortBd}`,color:chipShortTx,borderRadius:20,padding:"4px 10px",fontSize:12,fontWeight:700}}>
+            {st.icon}{st.value}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HistoryCard({history,dayColors,daySummaries,today,todaySnap,onPickColor,onSaveSummary}){
+  const [showAll,setShowAll]=useState(false);
+  const pastReversed=[...history].reverse();
+  // Show today + 1 past by default (2 total), rest folded
+  const entriesToShow=[
+    {...todaySnap,isToday:true},
+    ...(showAll?pastReversed:pastReversed.slice(0,1)),
+  ];
+  const extra=pastReversed.length-1;
+
+  return(
+    <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🍃 每日记录</div>
+        {extra>0&&(
+          <button onClick={()=>setShowAll(o=>!o)} style={{fontSize:11,fontWeight:800,color:"#5BAF5F",background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"3px 12px",cursor:"pointer"}}>
+            {showAll?`收起 ▲`:`更多 ${extra} 天 ▼`}
+          </button>
+        )}
+      </div>
+      {entriesToShow.map((h,i)=>(
+        <DayEntry
+          key={h.date+i}
+          h={h}
+          isToday={!!h.isToday}
+          bg={dayColors[h.date]||null}
+          summary={daySummaries[h.date]||""}
+          onPickColor={color=>onPickColor(h.date,color)}
+          onSaveSummary={text=>onSaveSummary(h.date,text)}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── tag color map (cycles through AC-palette colors) ────
+const TAG_COLORS = [
+  {bg:"#FFF0F0",border:"#FFB3B3",text:"#C0392B"},  // red – 担心
+  {bg:"#FFF8E8",border:"#FFD166",text:"#A06000"},  // yellow – 开心
+  {bg:"#F0FFF0",border:"#7BC67E",text:"#2E7D32"},  // green – 感恩
+  {bg:"#EEF4FF",border:"#7BAAE0",text:"#2855A0"},  // blue – 反思
+  {bg:"#F8E8FF",border:"#C9A8E8",text:"#6A3AAA"},  // purple – 突破
+  {bg:"#FFF4EE",border:"#FFBB88",text:"#9A4A00"},  // orange
+  {bg:"#F0FFFE",border:"#7DD4F0",text:"#1A6A8A"},  // teal
+  {bg:"#FFF0FA",border:"#FFB3E8",text:"#9A2070"},  // pink
+];
+const getTagColor=(tag,tags)=>{
+  const i=tags.indexOf(tag);
+  return TAG_COLORS[i%TAG_COLORS.length]||TAG_COLORS[0];
+};
+
+function BigEventsCard({events,eventTags,longStats,shortStats,onAdd,onEdit,onDeleteTag,onAddTag}){
+  const [activeTag,setActiveTag]=useState("all");
+  const [addingTag,setAddingTag]=useState(false);
+  const [newTagInput,setNewTagInput]=useState("");
+  const [showAll,setShowAll]=useState(false);
+
+  const filtered=activeTag==="all"?[...events].reverse():[...events].reverse().filter(ev=>ev.tag===activeTag);
+  const toShow=showAll?filtered:filtered.slice(0,2);
+  const extra=filtered.length-2;
+
+  const submitNewTag=()=>{
+    const t=newTagInput.trim();
+    if(!t)return;
+    onAddTag(t);
+    setNewTagInput("");
+    setAddingTag(false);
+    setActiveTag(t);
+  };
+
+  return(
+    <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
+      {/* header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📝 大事记录</div>
+        <button style={S.plusBtn} onClick={onAdd}>＋ 记录</button>
+      </div>
+
+      {/* tag filter row */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
+        <button onClick={()=>setActiveTag("all")}
+          style={{fontSize:11,fontWeight:activeTag==="all"?900:600,borderRadius:18,padding:"4px 12px",border:`2px solid ${activeTag==="all"?"#5BAF5F":"#D4EED4"}`,background:activeTag==="all"?"#5BAF5F":"#F8FFF8",color:activeTag==="all"?"#fff":"#5BAF5F",cursor:"pointer",transition:"all .15s"}}>
+          全部 {events.length}
+        </button>
+        {eventTags.map(t=>{
+          const tc=getTagColor(t,eventTags);
+          const count=events.filter(ev=>ev.tag===t).length;
+          const active=activeTag===t;
+          return(
+            <div key={t} style={{display:"flex",alignItems:"center",gap:0}}>
+              <button onClick={()=>setActiveTag(active?"all":t)}
+                style={{fontSize:11,fontWeight:active?900:600,borderRadius:"18px 0 0 18px",padding:"4px 10px",border:`2px solid ${tc.border}`,borderRight:"none",background:active?tc.border:tc.bg,color:tc.text,cursor:"pointer",transition:"all .15s"}}>
+                {t} {count>0&&<span style={{opacity:.7}}>{count}</span>}
+              </button>
+              <button onClick={()=>{if(activeTag===t)setActiveTag("all");onDeleteTag(t);}}
+                style={{fontSize:10,borderRadius:"0 18px 18px 0",padding:"4px 7px",border:`2px solid ${tc.border}`,borderLeft:"1px solid rgba(0,0,0,.1)",background:active?tc.border:tc.bg,color:tc.text,cursor:"pointer",opacity:.6,lineHeight:1}}>✕</button>
+            </div>
+          );
+        })}
+        {addingTag
+          ?<div style={{display:"flex",gap:4,alignItems:"center"}}>
+            <input autoFocus value={newTagInput} onChange={e=>setNewTagInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")submitNewTag();if(e.key==="Escape"){setAddingTag(false);setNewTagInput("");}}}
+              maxLength={8} placeholder="标签名…"
+              style={{width:68,background:"#FFFDF5",border:"2px solid #A8D8A8",borderRadius:10,padding:"4px 8px",fontSize:12,color:"#3D2B1F",outline:"none",fontFamily:"inherit"}}/>
+            <button onClick={submitNewTag} style={{fontSize:12,fontWeight:800,color:"#3A7D3E",background:"#F0FFF0",border:"2px solid #7BC67E",borderRadius:10,padding:"4px 8px",cursor:"pointer"}}>✓</button>
+            <button onClick={()=>{setAddingTag(false);setNewTagInput("");}} style={{fontSize:12,color:"#B09070",background:"none",border:"none",cursor:"pointer",padding:"4px"}}>✕</button>
+          </div>
+          :<button onClick={()=>setAddingTag(true)}
+            style={{fontSize:11,color:"#7BC67E",background:"#F0FFF0",border:"2px dashed #A8D8A8",borderRadius:18,padding:"4px 10px",cursor:"pointer",fontWeight:700}}>＋ 标签</button>
+        }
+      </div>
+
+      {/* events list */}
+      {filtered.length===0&&<div style={{color:"#C8A880",fontSize:13,textAlign:"center",padding:"12px 0"}}>{activeTag==="all"?"记录下影响你状态的重要事件":`还没有「${activeTag}」类型的记录`}</div>}
+      {toShow.map(ev=>{
+        const tc=ev.tag?getTagColor(ev.tag,eventTags):null;
+        return(
+          <div key={ev.id} style={{padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+              <span style={{fontSize:10,color:"#B09070",fontWeight:700}}>{ev.date}</span>
+              {ev.tag&&tc&&<span style={{fontSize:10,fontWeight:800,background:tc.bg,border:`1.5px solid ${tc.border}`,color:tc.text,borderRadius:14,padding:"2px 8px"}}>{ev.tag}</span>}
+              <button onClick={()=>onEdit(ev)} style={{marginLeft:"auto",background:"none",border:"none",fontSize:13,cursor:"pointer",opacity:.5,padding:"0 2px"}} title="编辑">✏️</button>
+            </div>
+            <div style={{fontSize:13,color:"#3D2B1F",lineHeight:1.65,marginBottom:6}}>{ev.text}</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {ev.xp>0&&<span style={{fontSize:11,fontWeight:700,background:"#F0FFF0",border:"1.5px solid #7BC67E",color:"#3A7D3E",borderRadius:20,padding:"3px 10px"}}>🌸+{ev.xp}</span>}
+              {ev.statChanges&&Object.entries(ev.statChanges).map(([k,v])=>{
+                const st=longStats[k]||shortStats[k]||{};
+                return<span key={k} style={{fontSize:11,fontWeight:700,background:v>=0?"#F0FFF0":"#FFF0F0",border:`1.5px solid ${v>=0?"#7BC67E":"#FF7B6B"}`,color:v>=0?"#3A7D3E":"#C0392B",borderRadius:20,padding:"3px 10px"}}>{st.icon}{v>0?"+":""}{v}</span>;
+              })}
+            </div>
+          </div>
+        );
+      })}
+      {!showAll&&extra>0&&<button onClick={()=>setShowAll(true)} style={{width:"100%",marginTop:8,fontSize:11,fontWeight:800,color:"#5BAF5F",background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"7px",cursor:"pointer"}}>展开更多 {extra} 条 ▼</button>}
+      {showAll&&filtered.length>2&&<button onClick={()=>setShowAll(false)} style={{width:"100%",marginTop:8,fontSize:11,fontWeight:800,color:"#7A5C44",background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:14,padding:"7px",cursor:"pointer"}}>收起 ▲</button>}
+    </div>
+  );
+}
+
+// ─── AC card wrapper ──────────────────────────────────────
+function ACCard({title,children,action}){
+  return(
+    <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>{title}</div>
+        {action&&action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── badge collection ─────────────────────────────────────
+function BadgeCollection({badges}){
+  const [filter,setFilter]=useState("all");
+  const [selected,setSelected]=useState(null);
+  const rarities=["all","common","rare","legend"];
+  const rarityLabel={all:"全部",common:"普通",rare:"稀有",legend:"传说"};
+  const filtered=filter==="all"?badges:badges.filter(b=>b.rarity===filter);
+  const counts={all:badges.length,common:badges.filter(b=>b.rarity==="common").length,rare:badges.filter(b=>b.rarity==="rare").length,legend:badges.filter(b=>b.rarity==="legend").length};
+  return(
+    <div>
+      <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+        {rarities.map(r=>{
+          const rc=r==="all"?null:RARITY_CFG[r];
+          const active=filter===r;
+          return<button key={r} onClick={()=>setFilter(r)} style={{border:`2px solid ${active?(rc?.border||"#7BC67E"):"#EDD9A3"}`,background:active?(rc?.bg||"#F0FFF0"):"#FFFDF5",color:active?(rc?.text||"#3A7D3E"):"#B09070",borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:active?900:600,cursor:"pointer"}}>{rarityLabel[r]} {counts[r]}</button>;
+        })}
+      </div>
+      {filtered.length===0&&<div style={{color:"#C8A880",fontSize:13,textAlign:"center",padding:"12px 0"}}>还没有{rarityLabel[filter]}徽章 🌱</div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+        {[...filtered].reverse().map(b=>{
+          const rc=RARITY_CFG[b.rarity];
+          return<div key={b.id} onClick={()=>setSelected(b)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",background:rc.bg,border:`2px solid ${rc.border}`,borderRadius:16,padding:"10px 4px",boxShadow:`0 3px 10px ${rc.glow}`}}>
+            <BadgeSVG name={b.name} rarity={b.rarity} size={44}/>
+            <div style={{fontSize:9,color:rc.text,textAlign:"center",lineHeight:1.3,fontWeight:800}}>{b.name}</div>
+          </div>;
+        })}
+      </div>
+      {selected&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSelected(null)}>
+          <div style={{background:"#FFFDF5",borderRadius:24,padding:"28px 24px",maxWidth:280,width:"90%",textAlign:"center",border:`3px solid ${RARITY_CFG[selected.rarity].border}`}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"center",marginBottom:14}}><BadgeSVG name={selected.name} rarity={selected.rarity} size={90}/></div>
+            <div style={{fontSize:18,fontWeight:900,color:"#3D2B1F",marginBottom:6}}>{selected.name}</div>
+            <div style={{fontSize:12,color:RARITY_CFG[selected.rarity].text,background:RARITY_CFG[selected.rarity].bg,borderRadius:20,padding:"4px 14px",display:"inline-block",marginBottom:6,fontWeight:800,border:`1.5px solid ${RARITY_CFG[selected.rarity].border}`}}>
+              {RARITY_CFG[selected.rarity].star} {RARITY_CFG[selected.rarity].label}
+            </div>
+            <div style={{fontSize:11,color:"#B09070",marginBottom:18}}>获得于 Lv.{selected.level} · {selected.date}</div>
+            <button style={{background:"#F0FFF0",border:"2px solid #7BC67E",color:"#3A7D3E",borderRadius:14,padding:"9px 28px",fontSize:13,fontWeight:800,cursor:"pointer"}} onClick={()=>setSelected(null)}>关闭 🍃</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── sub components ───────────────────────────────────────
+function Drawer({children,onClose}){
+  return<div style={S.overlay} onClick={onClose}>
+    <div style={S.drawer} onClick={e=>e.stopPropagation()}>
+      <div style={S.handle}/>
+      {children}
+    </div>
+  </div>;
+}
+function FL({children}){return<div style={S.fl}>{children}</div>;}
+function BonusRow({stats,bonus,onChange}){
+  return<div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:8}}>
+    {Object.entries(stats).map(([k,st])=>(
+      <div key={k} style={S.bonusItem}>
+        <span style={{fontSize:15}}>{st.icon}</span>
+        <span style={{fontSize:11,color:"#7A5C44",fontWeight:700}}>{st.label}</span>
+        <input type="number" min="0" max="99" style={S.nudgeInp} value={bonus[k]||""} placeholder="0"
+          onChange={e=>{const v=Number(e.target.value);const nb={...bonus};v?nb[k]=v:delete nb[k];onChange(nb);}}/>
+      </div>
+    ))}
+  </div>;
+}
+function HabitEditor({habit,longStats,shortStats,onSave,onDelete}){
+  const initD = migrateWeeklyBonus({...habit,weeklyBonus:habit.weeklyBonus||{stats:[]},weeklyTarget:habit.weeklyTarget||5,shortBonus:habit.shortBonus||{}});
+  const [d,setD]=useState(initD);
+  const upShort=(key,val)=>{const nb={...d.shortBonus};val>0?nb[key]=val:delete nb[key];setD(p=>({...p,shortBonus:nb}));};
+  const toggleStat=(k)=>{
+    const cur=d.weeklyBonus?.stats||[];
+    const next=cur.includes(k)?cur.filter(s=>s!==k):[...cur,k];
+    setD(p=>({...p,weeklyBonus:{...p.weeklyBonus,stats:next}}));
+  };
+  const curStats=d.weeklyBonus?.stats||[];
+  return<>
+    <div style={S.dH}>{habit.id?"编辑打卡项 ✏️":"新建打卡项 🌱"}</div>
+    <FL>名称</FL>
+    <input style={S.inp} placeholder="例：运动" value={d.label} onChange={e=>setD(p=>({...p,label:e.target.value}))}/>
+    <FL>主页 Emoji</FL>
+    <input style={{...S.inp,fontSize:26,textAlign:"center",width:72,marginBottom:12}} value={d.icon} onChange={e=>setD(p=>({...p,icon:e.target.value}))}/>
+    <FL>周打卡成就（每周达到目标次数可获得，可多选）</FL>
+    <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:8}}>
+      {Object.entries(longStats).map(([k,st])=>{
+        const on=curStats.includes(k);
+        return<button key={k}
+          style={{...S.bonusItem,cursor:"pointer",background:on?"#F0FFF0":"#FFFDF5",border:`1.5px solid ${on?"#7BC67E":"#D4EED4"}`}}
+          onClick={()=>toggleStat(k)}>
+          <span style={{fontSize:15}}>{st.icon}</span>
+          <span style={{fontSize:11,color:on?"#3A7D3E":"#7A5C44",fontWeight:700}}>{st.label}+1</span>
+          {on&&<span style={{fontSize:10,color:"#5BAF5F"}}>✓</span>}
+        </button>;
+      })}
+    </div>
+    <FL>每周目标次数（达到后获得周成就）</FL>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+      {[1,2,3,4,5,6,7].map(n=>(
+        <button key={n} onClick={()=>setD(p=>({...p,weeklyTarget:n}))}
+          style={{width:38,height:38,borderRadius:10,border:`2px solid ${d.weeklyTarget===n?"#7BC67E":"#EDD9A3"}`,background:d.weeklyTarget===n?"#F0FFF0":"#FFFDF5",color:d.weeklyTarget===n?"#3A7D3E":"#B09070",fontWeight:d.weeklyTarget===n?900:600,cursor:"pointer",fontSize:13}}>{n}</button>
+      ))}
+    </div>
+    <FL>今日属性加成（心情/体力）</FL>
+    <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
+      {Object.entries(shortStats).map(([k,st])=>(
+        <div key={k} style={S.bonusItem}><span style={{fontSize:15}}>{st.icon}</span><span style={{fontSize:11,color:"#7A5C44",fontWeight:700}}>{st.label}</span>
+          <input type="number" min="0" max="99" style={S.nudgeInp} value={d.shortBonus[k]||""} placeholder="0" onChange={e=>upShort(k,Number(e.target.value))}/></div>
+      ))}
+    </div>
+    <button style={S.cfmBtn} onClick={()=>onSave(d)}>保存</button>
+    {onDelete&&<button style={{...S.cfmBtn,marginTop:8,background:"#FFF0EE",color:"#C0392B",boxShadow:"none",border:"2px solid #FFB3A8"}} onClick={onDelete}>删除此打卡项</button>}
+  </>;
+}
+function RescueAdd({onAdd}){
+  const [v,setV]=useState("");
+  return<div style={{display:"flex",gap:8,marginTop:8}}>
+    <input style={{...S.inp,flex:1,marginBottom:0}} placeholder="添加新建议…" value={v} onChange={e=>setV(e.target.value)}
+      onKeyDown={e=>{if(e.key==="Enter"){onAdd(v);setV("");}}}/>
+    <button style={{...S.dBtn,padding:"10px 14px",flexShrink:0}} onClick={()=>{onAdd(v);setV("");}}>添加</button>
+  </div>;
+}
+
+// ─── styles ───────────────────────────────────────────────
+const S={
+  cl:      {fontSize:11,color:"#7A5C44",fontWeight:900,letterSpacing:.5,marginBottom:10},
+  empty:   {color:"#C8A880",fontSize:13,textAlign:"center",padding:"12px 0"},
+  plusBtn: {background:"#F0FFF0",border:"2px solid #7BC67E",color:"#3A7D3E",borderRadius:14,padding:"4px 14px",fontSize:12,fontWeight:800,cursor:"pointer"},
+  dBtn:    {background:"#F0FFF0",border:"2px solid #7BC67E",color:"#3A7D3E",borderRadius:12,padding:"7px 14px",fontSize:12,fontWeight:800,cursor:"pointer"},
+  xBtn:    {background:"#FFF0EE",border:"2px solid #FFB3A8",color:"#C0392B",borderRadius:12,padding:"7px 9px",fontSize:12,cursor:"pointer"},
+  editTxtBtn:{background:"#F0FFF0",border:"2px solid #7BC67E",color:"#3A7D3E",borderRadius:12,padding:"4px 12px",fontSize:11,fontWeight:800,cursor:"pointer"},
+  cfmBtn:  {width:"100%",background:"linear-gradient(135deg,#7BC67E,#5BAF5F)",border:"none",color:"#fff",borderRadius:16,padding:"15px",fontSize:15,fontWeight:900,boxShadow:"0 6px 20px rgba(91,175,95,.4)",cursor:"pointer"},
+  overlay: {position:"fixed",inset:0,background:"rgba(30,20,10,.45)",zIndex:100,display:"flex",alignItems:"flex-end"},
+  drawer:  {background:"#FFFDF5",borderRadius:"24px 24px 0 0",padding:"8px 20px max(44px,env(safe-area-inset-bottom,44px))",width:"100%",maxWidth:480,margin:"0 auto",maxHeight:"88vh",overflowY:"auto",border:"2px solid #EDD9A3",borderBottom:"none"},
+  handle:  {width:40,height:5,background:"#EDD9A3",borderRadius:3,margin:"0 auto 18px"},
+  dH:      {fontSize:17,fontWeight:900,marginBottom:14,color:"#3D2B1F"},
+  fl:      {fontSize:11,color:"#7A5C44",fontWeight:900,letterSpacing:.5,marginBottom:6,marginTop:10},
+  tog:     {display:"flex",gap:8,marginBottom:8},
+  tBtn:    {flex:1,background:"#FFFDF5",border:"2px solid #EDD9A3",color:"#B09070",borderRadius:14,padding:"9px",fontSize:12,fontWeight:700,cursor:"pointer"},
+  tOn:     {background:"#F0FFF0",border:"2px solid #7BC67E",color:"#3A7D3E",fontWeight:900},
+  inp:     {width:"100%",background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:14,color:"#3D2B1F",padding:"12px 16px",fontSize:15,marginBottom:6,display:"block",fontFamily:"inherit"},
+  bonusItem:{display:"flex",alignItems:"center",gap:5,background:"#F8FFF8",borderRadius:12,padding:"7px 10px",border:"1.5px solid #D4EED4"},
+  nudgeInp:{width:46,background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:8,color:"#3D2B1F",padding:"4px 6px",fontSize:14,textAlign:"center"},
+  settingSection:{marginBottom:16,paddingBottom:16,borderBottom:"2px dashed #EDD9A3"},
+  settingRow:{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1.5px dashed #EDD9A3"},
+};
+
+const root=ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
+</script>
+</body>
+</html>
