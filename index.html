@@ -1530,26 +1530,26 @@ function App(){
   );
 }
 const DAY_PALETTE = [
-  // row 1 – greens: light → dark
-  "#F0FFF4","#D8FFD0","#C8F0A8","#B8F5C8","#A8E6A3","#7BC67E","#5BAF5F","#3A8F3E","#2D7A32","#1A5C22",
-  // row 2 – blues: light → dark
-  "#E0F0FF","#D4F0FF","#C8E8FF","#B8D8F8","#AEE6F8","#A8C8F0","#7DD4F0","#7BAAE0","#4A8FD0","#2E6BB0",
-  // row 3 – yellows: light → dark
-  "#FFFBDC","#FFF9C4","#FFF3C4","#FFF0A8","#FFE8A8","#FFE4C4","#FFD166","#FFBB50","#F0A030","#D88020",
-  // row 4 – oranges: light → dark
-  "#FFE4D0","#FFD0B8","#FFCBA8","#FFC8A8","#FFBB88","#FFA880","#FF9A5C","#FF8860","#FF7B3E","#E05A20",
-  // row 5 – pinks/roses: light → dark
-  "#FFE8EC","#FFD0D8","#FFC8D4","#FFB8C8","#FFB3C6","#FF9EB5","#FF8FAA","#FF7898","#FF6B8A","#E8456A",
-  // row 6 – purples: light → dark
-  "#F8E8FF","#EDD4F8","#E8D0FF","#D8B8FF","#C9A8E8","#C8A0F0","#B888E0","#B088D8","#9060C0","#7040A8",
-  // row 7 – lavenders: light → dark
-  "#F0F4FF","#EEF0FF","#E0E8FF","#D8D8F8","#D0D8FF","#C0C8F8","#B8B8F0","#B0B8F0","#9898E0","#5858A8",
-  // row 8 – sands/earths: light → dark
-  "#FFF8F0","#FFE8D0","#F5E6C8","#F0D8B8","#EDD9A3","#E0C8A0","#D4B896","#D0B888","#C8A880","#A88060",
-  // row 9 – rose/mauve: light → dark
-  "#FFF0F0","#FFE8E8","#F8D8D8","#F8C8C8","#E8B8B8","#F0B0B0","#E89898","#D89898","#C87878","#A85858",
-  // row 10 – greys: light → dark
-  "#FFFFFF","#F8F8F8","#F0F4F8","#E0E8F0","#D8E8F0","#C8D8E8","#B0C0D0","#98A8B8","#7888A0","#384858",
+  // 红色 (参考色 #c1121f 为最深)
+  "#faeced","#f4d4d7","#ecb8bc","#e4999f","#db767d","#d2545e","#ca333e","#c41e2a","#c1121f",
+  // 橙色 (参考色 #e36414 为最深)
+  "#fdf3ec","#fae3d5","#f7d1b9","#f3bc9a","#efa577","#eb8f56","#e77a35","#e46c20","#e36414",
+  // 棕色 (参考色 #99582a 为最深)
+  "#f7f2ee","#ede1d9","#e0cdbf","#d3b7a3","#c49e83","#b68766","#a76f48","#9e6035","#99582a",
+  // 黄色 (偏浅，参考色 #ffcb05 为第8位)
+  "#fffbeb","#fff6d2","#ffefb4","#ffe994","#ffe16e","#ffda4b","#ffd228","#ffcb05","#c79e04",
+  // 绿色 (参考色 #4f772d 为最深)
+  "#f1f4ee","#dfe7d9","#cad6c0","#b3c5a5","#99b085","#809d68","#688a4a","#587e38","#4f772d",
+  // 青色 (参考色 #00a896 为最深)
+  "#ebf8f7","#d1efec","#b3e5e0","#91dad2","#6bcdc2","#47c0b3","#24b4a5","#0dac9b","#00a896",
+  // 蓝色 (参考色 #0077b6 为最深)
+  "#ebf4f9","#d1e7f2","#b3d6e9","#91c5e0","#6bb0d5","#479dca","#248ac0","#0d7eba","#0077b6",
+  // 紫色 (参考色 #7209b7 为最深)
+  "#f4ebf9","#e6d3f2","#d5b5e9","#c295e0","#ad70d5","#994ecb","#862bc1","#7915bb","#7209b7",
+  // 粉色 (参考色 #ff5d8f 为最深)
+  "#fff2f6","#ffe2eb","#ffcedd","#ffb9cf","#ffa1be","#ff8aae","#ff749f","#ff6595","#ff5d8f",
+  // 灰色 (参考色 #495057 为最深，首色纯白)
+  "#ffffff","#dee0e1","#c8cbcd","#b1b4b7","#959a9e","#7c8186","#62696f","#52595f","#495057",
 ];
 
 // luminance-based text color
@@ -1605,7 +1605,7 @@ function DayEntry({h,isToday,bg,summary,onPickColor,onSaveSummary}){
       {pickerOpen&&(
         <div style={{padding:"10px 14px 4px",animation:"fadeSlideUp .2s ease"}}>
           <div style={{fontSize:10,fontWeight:700,color:bg?tc+"aa":"#B09070",marginBottom:8}}>🎨 选择今天的颜色</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:4,marginBottom:8}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(9,1fr)",gap:4,marginBottom:8}}>
             {DAY_PALETTE.map(c=>(
               <button key={c} onClick={()=>{onPickColor(c);setPickerOpen(false);}}
                 style={{
@@ -1714,7 +1714,7 @@ function TodayEntry({today,dayColors,daySummaries,onPickColor,onSaveSummary}){
       {pickerOpen&&(
         <div style={{marginBottom:8,animation:"fadeSlideUp .2s ease"}}>
           <div style={{fontSize:10,fontWeight:700,color:bg?tc+"aa":"#B09070",marginBottom:8}}>🎨 选择今天的颜色</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:4,marginBottom:8}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(9,1fr)",gap:4,marginBottom:8}}>
             {DAY_PALETTE.map(c=>(
               <button key={c} onClick={()=>{onPickColor(today,c);setPickerOpen(false);}}
                 style={{
