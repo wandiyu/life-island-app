@@ -187,6 +187,22 @@ const DB_KEY = "lrpg6";
 const dbGet  = () => { try { const v=localStorage.getItem(DB_KEY); return v?JSON.parse(v):null; } catch{ return null; } };
 const dbSet  = (v) => { try { localStorage.setItem(DB_KEY, JSON.stringify(v)); } catch{} };
 
+// ─── language ─────────────────────────────────────────────
+const LANG_KEY = "lrpg6_lang";
+const getLang = () => { try { return localStorage.getItem(LANG_KEY)||"zh"; } catch{ return "zh"; } };
+const setLang = (l) => { try { localStorage.setItem(LANG_KEY, l); } catch{} };
+const LangCtx = React.createContext("zh");
+const useT = () => {
+  const lang = React.useContext(LangCtx);
+  return (zh, en) => lang === "en" ? en : zh;
+};
+// Convenience: call at top of any component
+const useLang = () => React.useContext(LangCtx);
+const T = {
+  home:["主页","Home"],quests:["任务","Quests"],habits:["打卡","Check-in"],log:["记录","Log"],
+};
+
+
 // ─── cloud sync ──────────────────────────────────────────
 let _fbUid = null; // current logged-in user's UID
 
@@ -464,10 +480,11 @@ const runWeeklySettle=(habits,checkedHabits,longStats)=>{
   return{newLongStats:newLong,extraFlowers,gains};
 };
 const rwdTxt=(r={},ls=DEF_LONG,ss=DEF_SHORT)=>{
-  const p=[`+${r.xp||0} 🌸`];
-  Object.entries(r.long||{}).forEach(([k,v])=>p.push(`${ls[k]?.icon||""}长期+${v}`));
-  Object.entries(r.short||{}).forEach(([k,v])=>p.push(`${ss[k]?.icon||""}今日+${v}`));
-  return p.join(" · ");
+  const p=[];
+  if(r.xp||0)p.push(`🌸+${r.xp||0}`);
+  Object.entries(r.long||{}).forEach(([k,v])=>{if(v)p.push(`${ls[k]?.icon||""}+${v}`)});
+  Object.entries(r.short||{}).forEach(([k,v])=>{if(v)p.push(`${ss[k]?.icon||""}+${v}`)});
+  return p.join("  ");
 };
 
 // ─── import/export ───────────────────────────────────────
@@ -515,6 +532,7 @@ const Leaf=({x,y,r=0,s=1,c="#7BC67E"})=>(
 
 // AC-style header cloud/hill SVG
 function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift}){
+  const t=useT();
   const hour=new Date().getHours();
   const isNight=hour<6||hour>=20;
   const isEvening=hour>=17&&hour<20;
@@ -602,10 +620,10 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
               {new Date().toLocaleDateString("zh-CN",{month:"long",day:"numeric",weekday:"short"})}
             </div>
             <div style={{fontSize:26,fontWeight:900,color:"#fff",lineHeight:1.1,textShadow:"0 2px 8px rgba(0,0,0,.15)"}}>
-              {playerName}的小岛
+              {playerName}{t("的小岛","'s Island")}
             </div>
             <div style={{fontSize:12,color:"rgba(255,255,255,.9)",marginTop:2,fontWeight:600}}>
-              🏝️ Lv.{level} 岛民 · {xp}/{xpNext} 🌸
+              🏝️ Lv.{level} {t("岛民","Islander")} · {xp}/{xpNext} 🌸
             </div>
           </div>
           {/* XP ring */}
@@ -819,6 +837,7 @@ function LoginScreen({onLogin}){
 // ─── app ─────────────────────────────────────────────────
 function App(){
   const [user,        setUser]         = useState(undefined); // undefined=loading, null=logged out, obj=logged in
+  const [lang,        setLangState]    = useState(getLang);
   const [s,           setS]           = useState(null);
   const [tab,         setTab]         = useState("home");
   const [toast,       setToast]       = useState(null);
@@ -892,6 +911,12 @@ function App(){
     if(d.pendingWeeklyResult===undefined) d.pendingWeeklyResult=null;
     // Migrate longStats: add growth if missing
     if(!d.longStats.growth)           d.longStats={...d.longStats,growth:{label:"成长",icon:"📚",value:60,color:"#8B5CF6"}};
+    // Force-update stat icons to latest emojis (overwrite whatever is in saved data)
+    if(d.longStats.health)  d.longStats={...d.longStats,health: {...d.longStats.health, icon:"🌿"}};
+    if(d.longStats.social)  d.longStats={...d.longStats,social: {...d.longStats.social, icon:"🤝"}};
+    if(d.longStats.growth)  d.longStats={...d.longStats,growth: {...d.longStats.growth, icon:"📚"}};
+    if(d.longStats.wealth)  d.longStats={...d.longStats,wealth: {...d.longStats.wealth, icon:"💰"}};
+    if(d.shortStats.mood)   d.shortStats={...d.shortStats,mood: {...d.shortStats.mood,  icon:"☀️"}};
     // Migrate habits: ensure weeklyBonus.stats array + weeklyTarget
     d.habits=d.habits.map(h=>{
       if(h.longBonus!==undefined&&h.weeklyBonus===undefined){
@@ -952,13 +977,26 @@ function App(){
   const completeQuest=id=>{
     const all=[...s.mainQuests,...s.sideQuests];const q=all.find(x=>x.id===id);if(!q||q.done)return;
     const r=q.reward||{};
-    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+(r.xp||0),s.player.level,s.player.xpNext,s.badges);
+    const lc={},sc={};
+    Object.keys(s.longStats).forEach(k=>{if(r.long&&r.long[k])lc[k]=r.long[k];});
+    Object.keys(s.shortStats).forEach(k=>{if(r.short&&r.short[k])sc[k]=r.short[k];});
+    const{longStats:newLong,extraFlowers}=applyLongWithOverflow(s.longStats,lc);
+    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+(r.xp||0)+extraFlowers,s.player.level,s.player.xpNext,s.badges);
     if(s.player.level===lv)pop(`✅ 完成！${rwdTxt(r,s.longStats,s.shortStats)}`);
     else{pop(`🎉 升级 Lv.${lv}！获得徽章！`);if(latestBadge)setNewBadge(latestBadge);}
-    save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
-      longStats:applyB(s.longStats,r.long||{}),shortStats:applyB(s.shortStats,r.short||{}),
-      mainQuests:s.mainQuests.map(q2=>q2.id===id?{...q2,done:true}:q2),
-      sideQuests:s.sideQuests.map(q2=>q2.id===id?{...q2,done:true}:q2),
+    // 确保"任务"标签存在
+    const existingTags=s.eventTags||[];
+    const newTags=existingTags.includes("任务")?existingTags:[...existingTags,"任务"];
+    const ev={id:Date.now(),date:todayKey(),text:q.title+(q.desc?`：${q.desc}`:""),xp:r.xp||0,statChanges:{...lc,...sc},tag:"任务"};
+    save({...s,
+      player:{...s.player,xp,level:lv,xpNext:xpN},
+      badges:newBadges,
+      longStats:newLong,
+      shortStats:applyB(s.shortStats,sc),
+      mainQuests:s.mainQuests.filter(q2=>q2.id!==id),
+      sideQuests:s.sideQuests.filter(q2=>q2.id!==id),
+      bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),
+      eventTags:newTags,
     });
   };
   const deleteQuest=id=>{
@@ -966,10 +1004,11 @@ function App(){
     pop("🗑️ 已删除");
   };
   const completeRecurring=id=>{
-    const q=s.recurringQuests.find(x=>x.id===id);if(!q||!canDoR(q))return;
+    const q=s.recurringQuests.find(x=>x.id===id);if(!q)return;
     const r=q.reward||{};
-    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+(r.xp||0),s.player.level,s.player.xpNext,s.badges);
-    if(s.player.level===lv)pop(`✅ ${q.title} 完成！`);
+    const gained=r.xp||0;
+    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+gained,s.player.level,s.player.xpNext,s.badges);
+    if(s.player.level===lv)pop(`✅ ${q.title} 完成！${rwdTxt(r,s.longStats,s.shortStats)}`);
     else{pop(`🎉 升级 Lv.${lv}！获得徽章！`);if(latestBadge)setNewBadge(latestBadge);}
     save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
       longStats:applyB(s.longStats,r.long||{}),shortStats:applyB(s.shortStats,r.short||{}),
@@ -1078,9 +1117,12 @@ function App(){
   const showAlert=lowMood||lowEnergy;
   const badges=s.badges||[];
 
-  const TABS=[["home","🌱","主页"],["quests","🌳","任务"],["habits","🌻","打卡"],["log","🍃","记录"]];
+  const t=useT();
+  const TABS=[["home","🌱",t("主页","Home")],["quests","🌳",t("任务","Quests")],["habits","🌻",t("打卡","Check-in")],["log","🍃",t("记录","Log")]];
 
+  const toggleLang=()=>{const nl=lang==="zh"?"en":"zh";setLangState(nl);setLang(nl);};
   return(
+    <LangCtx.Provider value={lang}>
     <div style={{fontFamily:"'Nunito','Noto Sans SC','PingFang SC',sans-serif",background:"#E8F5E9",minHeight:"100vh",maxWidth:480,margin:"0 auto",color:"#3D2B1F"}}>
 
       {/* firework overlay */}
@@ -1094,7 +1136,7 @@ function App(){
         <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.6)",zIndex:160,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{setShowWeeklyResult(false);save({...s,pendingWeeklyResult:null});}}>
           <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px",maxWidth:320,width:"92%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.25)",border:"3px solid #8B5CF6"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:32,marginBottom:4}}>🎊</div>
-            <div style={{fontSize:17,fontWeight:900,color:"#3D2B1F",marginBottom:4}}>本周结算完成！</div>
+            <div style={{fontSize:17,fontWeight:900,color:"#3D2B1F",marginBottom:4}}>{t("本周结算完成！","Weekly settlement!")}</div>
             <div style={{fontSize:12,color:"#8B5CF6",fontWeight:700,marginBottom:14}}>每周六·属性成长结算</div>
             {s.pendingWeeklyResult.gains.length===0
               ?<div style={{fontSize:13,color:"#B09070",marginBottom:14}}>本周没有达到5天目标的打卡项 🌱</div>
@@ -1112,7 +1154,7 @@ function App(){
                 🌸 属性溢出奖励 +{s.pendingWeeklyResult.flowers} 花
               </div>
             )}
-            <button style={{...S.cfmBtn}} onClick={()=>{setShowWeeklyResult(false);save({...s,pendingWeeklyResult:null});}}>太棒了！继续加油 🌿</button>
+            <button style={{...S.cfmBtn}} onClick={()=>{setShowWeeklyResult(false);save({...s,pendingWeeklyResult:null});}}>{t("太棒了！继续加油 🌿","Awesome! Keep going 🌿")}</button>
           </div>
         </div>
       )}
@@ -1122,7 +1164,7 @@ function App(){
         <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:150,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setNewBadge(null)}>
           <div style={{background:"#FFFDF5",borderRadius:28,padding:"32px 28px",maxWidth:300,width:"90%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.25)",border:"3px solid #7BC67E"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:28,marginBottom:4}}>🎉</div>
-            <div style={{fontSize:14,color:"#5BAF5F",fontWeight:700,marginBottom:4}}>升级啦！获得新徽章</div>
+            <div style={{fontSize:14,color:"#5BAF5F",fontWeight:700,marginBottom:4}}>{t("升级啦！获得新徽章","Level up! New badge")}</div>
             <div style={{display:"flex",justifyContent:"center",margin:"16px 0",animation:"badgePop .5s ease"}}>
               <BadgeSVG name={newBadge.name} rarity={newBadge.rarity} size={90}/>
             </div>
@@ -1130,7 +1172,7 @@ function App(){
             <div style={{fontSize:12,color:RARITY_CFG[newBadge.rarity].text,background:RARITY_CFG[newBadge.rarity].bg,borderRadius:20,padding:"4px 14px",display:"inline-block",marginBottom:20,fontWeight:700,border:`1.5px solid ${RARITY_CFG[newBadge.rarity].border}`}}>
               {RARITY_CFG[newBadge.rarity].star} {RARITY_CFG[newBadge.rarity].label}
             </div>
-            <button style={S.cfmBtn} onClick={()=>setNewBadge(null)}>太棒了！🌿</button>
+            <button style={S.cfmBtn} onClick={()=>setNewBadge(null)}>{t("太棒了！🌿","Awesome! 🌿")}</button>
           </div>
         </div>
       )}
@@ -1141,7 +1183,7 @@ function App(){
           <div style={{...S.drawer,maxHeight:"92vh"}} onClick={e=>e.stopPropagation()}>
             <div style={S.handle}/>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <div style={{fontSize:17,fontWeight:900,color:"#3D2B1F"}}>⚙️ 岛屿设置</div>
+              <div style={{fontSize:17,fontWeight:900,color:"#3D2B1F"}}>{t("⚙️ 岛屿设置","⚙️ Settings")}</div>
               <button style={{background:"#F5E6C8",border:"none",borderRadius:"50%",width:32,height:32,fontSize:16,cursor:"pointer",color:"#A86440"}} onClick={()=>setShowSettings(false)}>✕</button>
             </div>
             <SettingsLoginSection user={user} setUser={setUser} setS={setS} setShowSettings={setShowSettings} pop={pop}/>
@@ -1156,8 +1198,8 @@ function App(){
             <div style={S.settingSection}>
               <div style={S.cl}>💾 数据管理</div>
               <div style={{fontSize:12,color:"#B09070",marginBottom:10}}>包含徽章、大事记录、历史记录等全部数据</div>
-              <button style={{...S.cfmBtn,marginBottom:10}} onClick={()=>exportData(s)}>📤 导出数据备份</button>
-              <button style={{...S.cfmBtn,background:"linear-gradient(135deg,#70B8E0,#5BAF5F)"}} onClick={()=>importRef.current?.click()}>📥 导入数据</button>
+              <button style={{...S.cfmBtn,marginBottom:10}} onClick={()=>exportData(s)}>{t("📤 导出数据备份","📤 Export Backup")}</button>
+              <button style={{...S.cfmBtn,background:"linear-gradient(135deg,#70B8E0,#5BAF5F)"}} onClick={()=>importRef.current?.click()}>{t("📥 导入数据","📥 Import Data")}</button>
               <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={e=>{if(!e.target.files[0])return;importData(e.target.files[0],handleImport,err=>pop(`❌ 导入失败：${err}`));e.target.value="";}}/>
               <div style={{fontSize:11,color:"#B09070",marginTop:8,textAlign:"center"}}>导入将覆盖现有数据，请先导出备份</div>
             </div>
@@ -1201,7 +1243,7 @@ function App(){
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:22}}>🍂</span>
                 <span style={{flex:1,fontSize:13,fontWeight:700,color:"#A06000"}}>{[lowMood&&"心情",lowEnergy&&"体力"].filter(Boolean).join("、")} 偏低，需要充充电！</span>
-                <button style={{background:"#FFD166",border:"none",color:"#7A4A00",borderRadius:14,padding:"7px 16px",fontSize:12,fontWeight:900,cursor:"pointer",boxShadow:"0 2px 8px rgba(255,209,102,.5)"}} onClick={()=>setModal("rescue")}>拆礼物</button>
+                <button style={{background:"#FFD166",border:"none",color:"#7A4A00",borderRadius:14,padding:"7px 16px",fontSize:12,fontWeight:900,cursor:"pointer",boxShadow:"0 2px 8px rgba(255,209,102,.5)"}} onClick={()=>setModal("rescue")}>{t("拆礼物","Open Gift")}</button>
               </div>
             </div>
           )}
@@ -1219,7 +1261,7 @@ function App(){
                 </div>
               ))}
             </div>
-            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>点击属性 → 记录大事并调整数值</div>
+            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>{t("点击属性 → 记录大事并调整数值","Tap stat → log event & adjust")}</div>
           </ACCard>
           {/* short stats */}
           <ACCard title="☀️ 今日状态">
@@ -1244,18 +1286,18 @@ function App(){
           </ACCard>
           
           {/* motto */}
-          <ACCard title="🍃 座右铭" action={
-            <button style={S.editTxtBtn} onClick={()=>{setMottoD(s.motto||"");setEditingMotto(true);}}>编辑</button>
+          <ACCard title={t("🍃 座右铭","🍃 Motto")} action={
+            <button style={S.editTxtBtn} onClick={()=>{setMottoD(s.motto||"");setEditingMotto(true);}}>{t("编辑","Edit")}</button>
           }>
             {editingMotto
               ?<div>
                 <textarea style={{...S.inp,height:72,resize:"none",lineHeight:1.65,marginBottom:8}} value={mottoD} onChange={e=>setMottoD(e.target.value)} autoFocus/>
                 <div style={{display:"flex",gap:8}}>
-                  <button style={{...S.cfmBtn,flex:1,padding:"10px"}} onClick={()=>{save({...s,motto:mottoD});setEditingMotto(false);pop("🍃 座右铭已更新");}}>保存</button>
+                  <button style={{...S.cfmBtn,flex:1,padding:"10px"}} onClick={()=>{save({...s,motto:mottoD});setEditingMotto(false);pop("🍃 座右铭已更新");}}>{t("保存","Save")}</button>
                   <button style={{...S.dBtn,padding:"10px 16px"}} onClick={()=>setEditingMotto(false)}>取消</button>
                 </div>
               </div>
-              :<div style={{fontSize:15,color:"#3D2B1F",lineHeight:1.75,fontWeight:700,background:"#F8FFF8",borderRadius:14,padding:"12px 16px",border:"2px dashed #C8E8C8",fontStyle:"italic"}}>{s.motto||"点击「编辑」添加你的座右铭 🌿"}</div>
+              :<div style={{fontSize:15,color:"#3D2B1F",lineHeight:1.75,fontWeight:700,background:"#F8FFF8",borderRadius:14,padding:"12px 16px",border:"2px dashed #C8E8C8",fontStyle:"italic"}}>{s.motto||t("点击「编辑」添加你的座右铭 🌿","Click Edit to add your motto 🌿")}</div>
             }
           </ACCard>
         </>}
@@ -1263,36 +1305,37 @@ function App(){
         {/* ── 任务 ── */}
         {tab==="quests"&&<>
           {[["main","🌳 种树任务",s.mainQuests],["side","🗺️ 探索任务",s.sideQuests]].map(([type,label,list])=>(
-            <ACCard key={type} title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:type==="main"?20:5,period:"weekly",long:{},short:{}});setModal("quest");}}>＋ 新增</button>}>
+            <ACCard key={type} title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:type==="main"?20:5,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
               {list.length===0&&<div style={S.empty}>暂无任务，去冒险吧！</div>}
-              {list.map(q=>(
-                <div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3",opacity:q.done?.45:1}}>
+              {list.filter(q=>!q.done).map(q=>(
+                <div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:q.done?"#B09070":"#3D2B1F"}}>{q.done?"✅ ":"🔸 "}{q.title}</div>
+                    <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>🔸 {q.title}</div>
                     {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
                     <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
                   </div>
                   <div style={{display:"flex",gap:6,flexShrink:0}}>
-                    {!q.done&&<button style={S.dBtn} onClick={()=>completeQuest(q.id)}>完成</button>}
+                    <button style={S.dBtn} onClick={()=>completeQuest(q.id)}>完成</button>
                     <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
                   </div>
                 </div>
               ))}
             </ACCard>
           ))}
-          <ACCard title="🌸 浇水任务" action={<button style={S.plusBtn} onClick={()=>{setQForm({type:"recurring",title:"",desc:"",xp:5,period:"weekly",long:{},short:{}});setModal("quest");}}>＋ 新增</button>}>
+          <ACCard title={t("🌸 浇水任务","🌸 Recurring")} action={<button style={S.plusBtn} onClick={()=>{setQForm({type:"recurring",title:"",desc:"",xp:5,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
             {s.recurringQuests.length===0&&<div style={S.empty}>添加每周/每月浇水任务吧！</div>}
             {s.recurringQuests.map(q=>{
               const ok=canDoR(q);
-              return<div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3",opacity:ok?1:.5}}>
+              const lastDoneStr=q.lastDone?new Date(q.lastDone).toLocaleDateString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
+              return<div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:14,fontWeight:800,marginBottom:3}}>{ok?"🔄 ":"✅ "}{q.title}</div>
-                  <div style={{fontSize:10,color:"#B09070",marginBottom:2}}>{q.period==="weekly"?"每周":"每月"}</div>
+                  <div style={{fontSize:14,fontWeight:800,marginBottom:3}}>🔄 {q.title}</div>
+                  <div style={{fontSize:10,color:"#B09070",marginBottom:2}}>{q.period==="weekly"?"每周":"每月"}{lastDoneStr&&` · 上次：${lastDoneStr}`}</div>
                   {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
                   <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
                 </div>
                 <div style={{display:"flex",gap:6,flexShrink:0}}>
-                  {ok&&<button style={S.dBtn} onClick={()=>completeRecurring(q.id)}>完成</button>}
+                  <button style={S.dBtn} onClick={()=>completeRecurring(q.id)}>完成</button>
                   <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
                 </div>
               </div>;
@@ -1304,7 +1347,7 @@ function App(){
         {tab==="habits"&&(
           <>
           {/* 今日打卡 FIRST */}
-          <ACCard title="🌻 今日打卡" action={<button style={S.plusBtn} onClick={()=>{setHabEdit({id:"",label:"",icon:"⭐",weeklyBonus:{stats:[]},weeklyTarget:5,shortBonus:{}});setModal("habit");}}>＋ 新增</button>}>
+          <ACCard title={t("🌻 今日打卡","🌻 Today")} action={<button style={S.plusBtn} onClick={()=>{setHabEdit({id:"",label:"",icon:"⭐",weeklyBonus:{stats:[]},weeklyTarget:5,shortBonus:{}});setModal("habit");}}>{t("＋ 新增","＋ Add")}</button>}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
               {s.habits.map(h=>{
                 const done=!!th[h.id];
@@ -1324,7 +1367,7 @@ function App(){
             <div style={{height:8,background:"#D4EED4",borderRadius:4,overflow:"hidden"}}>
               <div style={{height:"100%",background:"linear-gradient(90deg,#7BC67E,#5BAF5F)",borderRadius:4,width:`${s.habits.length?(doneCnt/s.habits.length)*100:0}%`,transition:"width .4s"}}/>
             </div>
-            <div style={{fontSize:12,color:"#7A5C44",textAlign:"center",marginTop:8,fontWeight:700}}>今日进度 {doneCnt} / {s.habits.length} 🌿</div>
+            <div style={{fontSize:12,color:"#7A5C44",textAlign:"center",marginTop:8,fontWeight:700}}>{t("今日进度","Today")} {doneCnt} / {s.habits.length} 🌿</div>
           </ACCard>
 
           {/* 本周进度 SECOND */}
@@ -1359,6 +1402,15 @@ function App(){
 
         {/* ── 记录 ── */}
         {tab==="log"&&<>
+          {/* 今天 */}
+          <TodayEntry
+            today={today}
+            dayColors={s.dayColors||{}}
+            daySummaries={s.daySummaries||{}}
+            onPickColor={(dateKey,color)=>save({...s,dayColors:{...(s.dayColors||{}),[dateKey]:color}})}
+            onSaveSummary={(dateKey,text)=>save({...s,daySummaries:{...(s.daySummaries||{}),[dateKey]:text}})}
+          />
+
           {/* badge collection */}
           <ACCard title="🏅 徽章收藏" action={<span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{badges.length} 枚</span>}>
             {badges.length===0
@@ -1367,23 +1419,25 @@ function App(){
             }
           </ACCard>
 
-          {/* 每日记录 FIRST */}
-          <HistoryCard
+          {/* 🌈 色彩日记 */}
+          <ColorCalendar
             history={s.history}
             dayColors={s.dayColors||{}}
             daySummaries={s.daySummaries||{}}
+            bigEvents={s.bigEvents||[]}
             today={today}
             todaySnap={{date:today,long:s.longStats,short:s.shortStats,level:s.player.level}}
             onPickColor={(dateKey,color)=>save({...s,dayColors:{...(s.dayColors||{}),[dateKey]:color}})}
             onSaveSummary={(dateKey,text)=>save({...s,daySummaries:{...(s.daySummaries||{}),[dateKey]:text}})}
           />
 
-          {/* 大事记录 SECOND */}
+          {/* 大事记录：今日 + 标签搜索全部历史 */}
           <BigEventsCard
             events={s.bigEvents}
             eventTags={s.eventTags||[]}
             longStats={s.longStats}
             shortStats={s.shortStats}
+            today={today}
             onAdd={()=>{setEvForm({text:"",xp:0,changes:{},tag:""});setModal("bigEvent");}}
             onEdit={(ev)=>{setEvForm({id:ev.id,text:ev.text,xp:ev.xp||0,changes:ev.statChanges||{},tag:ev.tag||""});setModal("bigEvent");}}
             onDeleteTag={tag=>save({...s,eventTags:(s.eventTags||[]).filter(t=>t!==tag)})}
@@ -1401,14 +1455,14 @@ function App(){
 
       {modal==="quest"&&qForm&&(
         <Drawer onClose={()=>{setModal(null);setQForm(null);}}>
-          <div style={S.dH}>接取新任务 🌱</div>
+          <div style={S.dH}>{t("接取新任务 🌱","New Quest 🌱")}</div>
           <div style={S.tog}>
-            {[["main","🌳 种树"],["side","🗺️ 探索"],["recurring","🌸 浇水"]].map(([t,l])=>(
+            {[["main",t("🌳 种树","🌳 Main")],["side",t("🗺️ 探索","🗺️ Side")],["recurring",t("🌸 浇水","🌸 Recurring")]].map(([t,l])=>(
               <button key={t} style={{...S.tBtn,...(qForm.type===t?S.tOn:{})}} onClick={()=>setQForm(p=>({...p,type:t}))}>{l}</button>
             ))}
           </div>
           {qForm.type==="recurring"&&<div style={S.tog}>
-            {[["weekly","每周"],["monthly","每月"]].map(([t,l])=>(
+            {[["weekly",t("每周","Weekly")],["monthly",t("每月","Monthly")]].map(([t,l])=>(
               <button key={t} style={{...S.tBtn,...(qForm.period===t?S.tOn:{})}} onClick={()=>setQForm(p=>({...p,period:t}))}>{l}</button>
             ))}
           </div>}
@@ -1472,10 +1526,9 @@ function App(){
         </Drawer>
       )}
     </div>
+    </LangCtx.Provider>
   );
 }
-
-// ─── history card with color picker + summary ─────────────
 const DAY_PALETTE = [
   // row 1 – greens: light → dark
   "#F0FFF4","#D8FFD0","#C8F0A8","#B8F5C8","#A8E6A3","#7BC67E","#5BAF5F","#3A8F3E","#2D7A32","#1A5C22",
@@ -1621,102 +1674,254 @@ function DayEntry({h,isToday,bg,summary,onPickColor,onSaveSummary}){
   );
 }
 
-function HistoryCard({history,dayColors,daySummaries,today,todaySnap,onPickColor,onSaveSummary}){
-  const [showAll,setShowAll]=useState(false);
-  const pastReversed=[...history].reverse();
-  // Show today + 1 past by default (2 total), rest folded
-  const entriesToShow=[
-    {...todaySnap,isToday:true},
-    ...(showAll?pastReversed:pastReversed.slice(0,1)),
-  ];
-  const extra=pastReversed.length-1;
+// ─── TodayEntry: 今天——颜色+一句话 ────────────────────────
+function TodayEntry({today,dayColors,daySummaries,onPickColor,onSaveSummary}){
+  const bg=dayColors[today]||null;
+  const summary=daySummaries[today]||"";
+  const tc=textOnBg(bg);
+  const [pickerOpen,setPickerOpen]=useState(false);
+  const [editingSum,setEditingSum]=useState(false);
+  const [sumDraft,setSumDraft]=useState(summary);
 
   return(
-    <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🍃 每日记录</div>
-        {extra>0&&(
-          <button onClick={()=>setShowAll(o=>!o)} style={{fontSize:11,fontWeight:800,color:"#5BAF5F",background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"3px 12px",cursor:"pointer"}}>
-            {showAll?`收起 ▲`:`更多 ${extra} 天 ▼`}
-          </button>
-        )}
-      </div>
-      {entriesToShow.map((h,i)=>(
-        <DayEntry
-          key={h.date+i}
-          h={h}
-          isToday={!!h.isToday}
-          bg={dayColors[h.date]||null}
-          summary={daySummaries[h.date]||""}
-          onPickColor={color=>onPickColor(h.date,color)}
-          onSaveSummary={text=>onSaveSummary(h.date,text)}
+    <div style={{
+      borderRadius:22,
+      background:bg||"#FFFDF5",
+      border:`2px solid ${bg||"#EDD9A3"}`,
+      padding:"14px 16px",
+      marginBottom:12,
+      boxShadow:bg?`0 4px 20px ${bg}66`:"0 4px 20px rgba(90,60,30,.08)",
+      transition:"background .3s,border .3s",
+    }}>
+      {/* header row: 今天 label + color dot */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div style={{fontSize:12,fontWeight:900,letterSpacing:.5,color:bg?tc:"#7A5C44"}}>🍃 今天</div>
+        <button
+          onClick={()=>setPickerOpen(o=>!o)}
+          title="选择今天的颜色"
+          style={{
+            width:26,height:26,borderRadius:"50%",
+            background:bg||"#E8F5E8",
+            border:`2.5px solid ${bg?tc+"66":"#A8D8A8"}`,
+            cursor:"pointer",flexShrink:0,
+            boxShadow:pickerOpen?`0 0 0 3px ${bg||"#7BC67E"}55`:"none",
+            transition:"box-shadow .2s",
+          }}
         />
-      ))}
+      </div>
+
+      {/* 颜色选板 */}
+      {pickerOpen&&(
+        <div style={{marginBottom:8,animation:"fadeSlideUp .2s ease"}}>
+          <div style={{fontSize:10,fontWeight:700,color:bg?tc+"aa":"#B09070",marginBottom:8}}>🎨 选择今天的颜色</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:4,marginBottom:8}}>
+            {DAY_PALETTE.map(c=>(
+              <button key={c} onClick={()=>{onPickColor(today,c);setPickerOpen(false);}}
+                style={{
+                  width:"100%",aspectRatio:"1",borderRadius:6,
+                  background:c,
+                  border:`2px solid ${bg===c?"#3D2B1F":"rgba(0,0,0,.08)"}`,
+                  cursor:"pointer",outline:"none",
+                }}
+              />
+            ))}
+          </div>
+          {bg&&(
+            <button onClick={()=>{onPickColor(today,"");setPickerOpen(false);}}
+              style={{fontSize:11,color:bg?tc:"#7A5C44",background:"none",border:"none",cursor:"pointer",fontWeight:700,textDecoration:"underline",opacity:.7}}>
+              清除颜色
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 一句话总结 */}
+      {editingSum
+        ?<div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <input
+            autoFocus
+            style={{flex:1,background:"rgba(255,255,255,.6)",border:`1.5px solid ${bg?tc+"55":"#C8E8C8"}`,borderRadius:10,padding:"7px 10px",fontSize:13,color:bg?tc:"#3D2B1F",outline:"none",fontFamily:"inherit"}}
+            value={sumDraft}
+            placeholder="用一句话描述今天…"
+            onChange={e=>setSumDraft(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"){onSaveSummary(today,sumDraft);setEditingSum(false);}if(e.key==="Escape")setEditingSum(false);}}
+            maxLength={60}
+          />
+          <button onClick={()=>{onSaveSummary(today,sumDraft);setEditingSum(false);}}
+            style={{background:"rgba(255,255,255,.5)",border:`1.5px solid ${bg?tc+"55":"#A8D8A8"}`,borderRadius:10,padding:"7px 10px",fontSize:12,fontWeight:800,color:bg?tc:"#3A7D3E",cursor:"pointer"}}>
+            ✓
+          </button>
+        </div>
+        :<div onClick={()=>{setSumDraft(daySummaries[today]||"");setEditingSum(true);}} style={{
+          fontSize:13,fontWeight:700,
+          color:bg?tc:(summary?"#3D2B1F":"#C8A880"),
+          fontStyle:summary?"normal":"italic",
+          cursor:"text",
+          padding:"3px 2px",
+          minHeight:24,
+        }}>
+          {summary||"✏️ 点击添加一句话总结…"}
+        </div>
+      }
     </div>
   );
 }
 
-// ─── tag color map (cycles through AC-palette colors) ────
-const TAG_COLORS = [
-  {bg:"#FFF0F0",border:"#FFB3B3",text:"#C0392B"},  // red – 担心
-  {bg:"#FFF8E8",border:"#FFD166",text:"#A06000"},  // yellow – 开心
-  {bg:"#F0FFF0",border:"#7BC67E",text:"#2E7D32"},  // green – 感恩
-  {bg:"#EEF4FF",border:"#7BAAE0",text:"#2855A0"},  // blue – 反思
-  {bg:"#F8E8FF",border:"#C9A8E8",text:"#6A3AAA"},  // purple – 突破
-  {bg:"#FFF4EE",border:"#FFBB88",text:"#9A4A00"},  // orange
-  {bg:"#F0FFFE",border:"#7DD4F0",text:"#1A6A8A"},  // teal
-  {bg:"#FFF0FA",border:"#FFB3E8",text:"#9A2070"},  // pink
-];
-const getTagColor=(tag,tags)=>{
-  const i=tags.indexOf(tag);
-  return TAG_COLORS[i%TAG_COLORS.length]||TAG_COLORS[0];
-};
+// ─── ColorCalendar: 颜色日历回望 ──────────────────────────
+function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap,onPickColor,onSaveSummary}){
+  const [selected,setSelected]=useState(null); // dateKey or null
+  const [open,setOpen]=useState(false);
 
-function BigEventsCard({events,eventTags,longStats,shortStats,onAdd,onEdit,onDeleteTag,onAddTag}){
-  const [activeTag,setActiveTag]=useState("all");
+  // Build all days: today + history, sorted newest first
+  const allDays=[
+    {date:today,...todaySnap,isToday:true},
+    ...[...history].reverse(),
+  ];
+
+  // Group by month
+  const byMonth=[];
+  const monthMap={};
+  allDays.forEach(d=>{
+    // dateKey format: "2025/01/15" → "2025/01"
+    const mk=d.date?d.date.slice(0,7):"";
+    if(!monthMap[mk]){monthMap[mk]=[];byMonth.push({mk,days:monthMap[mk]});}
+    monthMap[mk].push(d);
+  });
+
+  const selectedDay=selected?allDays.find(d=>d.date===selected):null;
+  const selectedBg=selected?dayColors[selected]||null:null;
+  const selectedEvents=(bigEvents||[]).filter(ev=>ev.date===selected);
+
+  return(
+    <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
+      {/* header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🌈 色彩日记</div>
+        <button onClick={()=>setOpen(o=>!o)} style={{fontSize:11,fontWeight:800,color:"#5BAF5F",background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"3px 12px",cursor:"pointer"}}>
+          {open?"收起 ▲":"展开 ▼"}
+        </button>
+      </div>
+
+      {/* calendar grid */}
+      {byMonth.slice(0,open?byMonth.length:1).map(({mk,days})=>(
+        <div key={mk} style={{marginBottom:14}}>
+          <div style={{fontSize:10,color:"#B09070",fontWeight:800,marginBottom:8,letterSpacing:1}}>{mk.replace("/","年").replace("/","月")} 月</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+            {days.map(d=>{
+              const bg=dayColors[d.date]||null;
+              const hasSummary=!!(daySummaries[d.date]);
+              const isSelected=selected===d.date;
+              const isToday=d.isToday;
+              return(
+                <button
+                  key={d.date}
+                  onClick={()=>setSelected(isSelected?null:d.date)}
+                  title={d.date+(hasSummary?" · "+daySummaries[d.date]:"")}
+                  style={{
+                    width:32,height:32,borderRadius:10,
+                    background:bg||(isToday?"#f4f9e8":"#F0F0EC"),
+                    border:isSelected?`2.5px solid #4e6a1a`:isToday?`2px solid #a7c957`:`2px solid ${bg?"rgba(0,0,0,.1)":"#D8D8D0"}`,
+                    cursor:"pointer",
+                    position:"relative",
+                    boxShadow:isSelected?"0 0 0 2px #a7c957":bg?`0 2px 6px ${bg}66`:"none",
+                    transition:"all .15s",
+                    flexShrink:0,
+                  }}
+                >
+                  {isToday&&!bg&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:4,height:4,borderRadius:"50%",background:"#a7c957"}}/>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* selected day detail */}
+      {selected&&selectedDay&&(
+        <div style={{marginTop:12,borderTop:"2px dashed #EDD9A3",paddingTop:14,animation:"fadeSlideUp .25s ease"}}>
+          <DayEntry
+            h={selectedDay}
+            isToday={selectedDay.isToday}
+            bg={selectedBg}
+            summary={daySummaries[selected]||""}
+            onPickColor={color=>onPickColor(selected,color)}
+            onSaveSummary={text=>onSaveSummary(selected,text)}
+          />
+          {/* that day's big events */}
+          {selectedEvents.length>0&&(
+            <div style={{marginTop:4}}>
+              {selectedEvents.map(ev=>(
+                <div key={ev.id} style={{padding:"8px 10px",borderRadius:12,background:"#FAFFF8",border:"1.5px dashed #C8E8C8",marginBottom:6,fontSize:13,color:"#3D2B1F",lineHeight:1.6}}>
+                  {ev.tag&&<span style={{fontSize:10,fontWeight:800,color:"#5BAF5F",marginRight:6}}>#{ev.tag}</span>}
+                  {ev.text}
+                </div>
+              ))}
+            </div>
+          )}
+          {selectedEvents.length===0&&(
+            <div style={{fontSize:12,color:"#C8A880",textAlign:"center",padding:"6px 0"}}>这一天没有大事记录</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── BigEventsCard: 今日 + 标签搜索历史 ───────────────────
+function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit,onDeleteTag,onAddTag}){
+  const t=useT();
+  const [activeTag,setActiveTag]=useState("today"); // "today"|"all"|tagName
   const [addingTag,setAddingTag]=useState(false);
   const [newTagInput,setNewTagInput]=useState("");
-  const [showAll,setShowAll]=useState(false);
 
-  const filtered=activeTag==="all"?[...events].reverse():[...events].reverse().filter(ev=>ev.tag===activeTag);
-  const toShow=showAll?filtered:filtered.slice(0,2);
-  const extra=filtered.length-2;
+  const todayEvents=[...events].reverse().filter(ev=>ev.date===today);
+  const filtered=
+    activeTag==="today"?todayEvents:
+    activeTag==="all"?[...events].reverse():
+    [...events].reverse().filter(ev=>ev.tag===activeTag);
 
   const submitNewTag=()=>{
-    const t=newTagInput.trim();
-    if(!t)return;
-    onAddTag(t);
+    const tag=newTagInput.trim();
+    if(!tag)return;
+    onAddTag(tag);
     setNewTagInput("");
     setAddingTag(false);
-    setActiveTag(t);
+    setActiveTag(tag);
   };
 
   return(
     <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
       {/* header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📝 大事记录</div>
-        <button style={S.plusBtn} onClick={onAdd}>＋ 记录</button>
+        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📌 大事记录</div>
+        <button style={S.plusBtn} onClick={onAdd}>{t("＋ 记录","＋ Add")}</button>
       </div>
 
-      {/* tag filter row */}
+      {/* tag filter */}
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
+        {/* 今日 tab */}
+        <button onClick={()=>setActiveTag("today")}
+          style={{fontSize:11,fontWeight:activeTag==="today"?900:600,borderRadius:18,padding:"4px 12px",border:`2px solid ${activeTag==="today"?"#a7c957":"#D4EED4"}`,background:activeTag==="today"?"#a7c957":"#F8FFF8",color:activeTag==="today"?"#fff":"#5BAF5F",cursor:"pointer",transition:"all .15s"}}>
+          今日 {todayEvents.length}
+        </button>
+        {/* 全部 tab */}
         <button onClick={()=>setActiveTag("all")}
           style={{fontSize:11,fontWeight:activeTag==="all"?900:600,borderRadius:18,padding:"4px 12px",border:`2px solid ${activeTag==="all"?"#5BAF5F":"#D4EED4"}`,background:activeTag==="all"?"#5BAF5F":"#F8FFF8",color:activeTag==="all"?"#fff":"#5BAF5F",cursor:"pointer",transition:"all .15s"}}>
-          全部 {events.length}
+          全部
         </button>
-        {eventTags.map(t=>{
-          const tc=getTagColor(t,eventTags);
-          const count=events.filter(ev=>ev.tag===t).length;
-          const active=activeTag===t;
+        {/* tag pills */}
+        {eventTags.map(tag=>{
+          const tc=getTagColor(tag,eventTags);
+          const count=events.filter(ev=>ev.tag===tag).length;
+          const active=activeTag===tag;
           return(
-            <div key={t} style={{display:"flex",alignItems:"center",gap:0}}>
-              <button onClick={()=>setActiveTag(active?"all":t)}
-                style={{fontSize:11,fontWeight:active?900:600,borderRadius:"18px 0 0 18px",padding:"4px 10px",border:`2px solid ${tc.border}`,borderRight:"none",background:active?tc.border:tc.bg,color:tc.text,cursor:"pointer",transition:"all .15s"}}>
-                {t} {count>0&&<span style={{opacity:.7}}>{count}</span>}
+            <div key={tag} style={{display:"flex",alignItems:"center"}}>
+              <button onClick={()=>setActiveTag(active?"today":tag)}
+                style={{fontSize:11,fontWeight:active?900:600,borderRadius:"18px 0 0 18px",padding:"4px 10px",border:`2px solid ${tc.border}`,borderRight:"none",background:active?tc.border:tc.bg,color:tc.text,cursor:"pointer"}}>
+                {tag}{count>0&&<span style={{opacity:.7}}> {count}</span>}
               </button>
-              <button onClick={()=>{if(activeTag===t)setActiveTag("all");onDeleteTag(t);}}
-                style={{fontSize:10,borderRadius:"0 18px 18px 0",padding:"4px 7px",border:`2px solid ${tc.border}`,borderLeft:"1px solid rgba(0,0,0,.1)",background:active?tc.border:tc.bg,color:tc.text,cursor:"pointer",opacity:.6,lineHeight:1}}>✕</button>
+              <button onClick={()=>{if(activeTag===tag)setActiveTag("today");onDeleteTag(tag);}}
+                style={{fontSize:10,borderRadius:"0 18px 18px 0",padding:"4px 7px",border:`2px solid ${tc.border}`,borderLeft:"1px solid rgba(0,0,0,.1)",background:active?tc.border:tc.bg,color:tc.text,cursor:"pointer",opacity:.6}}>✕</button>
             </div>
           );
         })}
@@ -1735,15 +1940,19 @@ function BigEventsCard({events,eventTags,longStats,shortStats,onAdd,onEdit,onDel
       </div>
 
       {/* events list */}
-      {filtered.length===0&&<div style={{color:"#C8A880",fontSize:13,textAlign:"center",padding:"12px 0"}}>{activeTag==="all"?"记录下影响你状态的重要事件":`还没有「${activeTag}」类型的记录`}</div>}
-      {toShow.map(ev=>{
+      {filtered.length===0&&(
+        <div style={{color:"#C8A880",fontSize:13,textAlign:"center",padding:"12px 0"}}>
+          {activeTag==="today"?"今天还没有大事记录":activeTag==="all"?"还没有记录":` 还没有「${activeTag}」的记录`}
+        </div>
+      )}
+      {filtered.map(ev=>{
         const tc=ev.tag?getTagColor(ev.tag,eventTags):null;
         return(
           <div key={ev.id} style={{padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
               <span style={{fontSize:10,color:"#B09070",fontWeight:700}}>{ev.date}</span>
               {ev.tag&&tc&&<span style={{fontSize:10,fontWeight:800,background:tc.bg,border:`1.5px solid ${tc.border}`,color:tc.text,borderRadius:14,padding:"2px 8px"}}>{ev.tag}</span>}
-              <button onClick={()=>onEdit(ev)} style={{marginLeft:"auto",background:"none",border:"none",fontSize:13,cursor:"pointer",opacity:.5,padding:"0 2px"}} title="编辑">✏️</button>
+              <button onClick={()=>onEdit(ev)} style={{marginLeft:"auto",background:"none",border:"none",fontSize:13,cursor:"pointer",opacity:.5,padding:"0 2px"}}>✏️</button>
             </div>
             <div style={{fontSize:13,color:"#3D2B1F",lineHeight:1.65,marginBottom:6}}>{ev.text}</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -1756,11 +1965,24 @@ function BigEventsCard({events,eventTags,longStats,shortStats,onAdd,onEdit,onDel
           </div>
         );
       })}
-      {!showAll&&extra>0&&<button onClick={()=>setShowAll(true)} style={{width:"100%",marginTop:8,fontSize:11,fontWeight:800,color:"#5BAF5F",background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"7px",cursor:"pointer"}}>展开更多 {extra} 条 ▼</button>}
-      {showAll&&filtered.length>2&&<button onClick={()=>setShowAll(false)} style={{width:"100%",marginTop:8,fontSize:11,fontWeight:800,color:"#7A5C44",background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:14,padding:"7px",cursor:"pointer"}}>收起 ▲</button>}
     </div>
   );
 }
+const TAG_COLORS = [
+  {bg:"#FFF0F0",border:"#FFB3B3",text:"#C0392B"},
+  {bg:"#FFF8E8",border:"#FFD166",text:"#A06000"},
+  {bg:"#F0FFF0",border:"#7BC67E",text:"#2E7D32"},
+  {bg:"#EEF4FF",border:"#7BAAE0",text:"#2855A0"},
+  {bg:"#F8E8FF",border:"#C9A8E8",text:"#6A3AAA"},
+  {bg:"#FFF4EE",border:"#FFBB88",text:"#9A4A00"},
+  {bg:"#F0FFFE",border:"#7DD4F0",text:"#1A6A8A"},
+  {bg:"#FFF0FA",border:"#FFB3E8",text:"#9A2070"},
+];
+const getTagColor=(tag,tags)=>{
+  const i=tags.indexOf(tag);
+  return TAG_COLORS[i%TAG_COLORS.length]||TAG_COLORS[0];
+};
+
 
 // ─── AC card wrapper ──────────────────────────────────────
 function ACCard({title,children,action}){
@@ -1822,6 +2044,7 @@ function BadgeCollection({badges}){
 // ─── firework ────────────────────────────────────────────
 const FW_COLORS=["#a7c957","#7fa832","#FFD166","#FF9A5C","#70B8E0","#FFB3C6","#8B5CF6","#fff"];
 function Firework({onDone}){
+  const t=useT();
   const particles=useMemo(()=>{
     const rockets=[
       {x:20,color:"#a7c957"},{x:50,color:"#FFD166"},{x:80,color:"#FF9A5C"},
@@ -1853,8 +2076,8 @@ function Firework({onDone}){
       {/* 中央提示 */}
       <div style={{position:"absolute",top:"38%",left:"50%",transform:"translateX(-50%)",textAlign:"center",animation:"fwFade 3s ease forwards"}}>
         <div style={{fontSize:52,lineHeight:1,marginBottom:8,animation:"badgePop .4s cubic-bezier(.34,1.56,.64,1)"}}>🎉</div>
-        <div style={{fontSize:22,fontWeight:900,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,.4)",letterSpacing:.5}}>今日全部完成！</div>
-        <div style={{fontSize:16,color:"#FFD166",fontWeight:800,marginTop:6,textShadow:"0 1px 6px rgba(0,0,0,.4)"}}>🌸 +10 花</div>
+        <div style={{fontSize:22,fontWeight:900,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,.4)",letterSpacing:.5}}>{t("今日全部完成！","All done today!")}</div>
+        <div style={{fontSize:16,color:"#FFD166",fontWeight:800,marginTop:6,textShadow:"0 1px 6px rgba(0,0,0,.4)"}}>{t("🌸 +10 花","🌸 +10 flowers")}</div>
       </div>
       {/* 烟花 */}
       {particles.map((r,ri)=>(
@@ -1918,7 +2141,7 @@ function GiftBoxButton({onClick}){
           </svg>
         </div>
         <div style={{textAlign:"left"}}>
-          <div style={{fontSize:15,fontWeight:900,color:"#4e6a1a",letterSpacing:.3}}>抽个充能礼物吧</div>
+          <div style={{fontSize:15,fontWeight:900,color:"#4e6a1a",letterSpacing:.3}}>{t("抽个充能礼物吧","Open a gift")}</div>
           <div style={{fontSize:11,color:"#7fa832",marginTop:2,fontWeight:600}}>点击拆开，获取今日充能建议 🌿</div>
         </div>
       </div>
@@ -1927,6 +2150,7 @@ function GiftBoxButton({onClick}){
 }
 
 function GiftModal({rescueList,onClose,onEditList,drawn,setDrawn,s,save,pop}){
+  const t=useT();
   const [phase,setPhase]=useState("idle");
   const [theme,setTheme]=useState(GIFT_THEMES[0]);
   const [confetti,setConfetti]=useState([]);
@@ -2037,17 +2261,17 @@ function GiftModal({rescueList,onClose,onEditList,drawn,setDrawn,s,save,pop}){
               <div style={{width:48,height:3,background:`linear-gradient(90deg,${theme.ribbon},${theme.accent})`,borderRadius:2,margin:"0 auto"}}/>
             </div>
             <button style={{width:"100%",background:"linear-gradient(135deg,#a7c957,#7fa832)",border:"none",color:"#fff",borderRadius:16,padding:"15px",fontSize:15,fontWeight:900,boxShadow:"0 6px 20px rgba(127,168,50,.45)",cursor:"pointer",marginBottom:10}} onClick={reopen}>
-              🎀 再拆一个
+              {t("🎀 再拆一个","🎀 Open another")}
             </button>
             <button style={{width:"100%",background:"#f4f9e8",border:"2px solid #a7c957",color:"#4e6a1a",borderRadius:16,padding:"13px",fontSize:14,fontWeight:800,cursor:"pointer",marginBottom:10}} onClick={doIt}>
-              ✅ 就这个，去做！🌸+1
+              {t("✅ 就这个，去做！🌸+1","✅ Do it! 🌸+1")}
             </button>
           </div>
         )}
 
         <div style={{textAlign:"center",marginTop:8,paddingBottom:4}}>
           <div style={{fontSize:13,fontWeight:900,color:"#4e6a1a",marginBottom:6}}>抽个充能礼物吧</div>
-          <button style={{background:"none",border:"none",color:"#B09070",fontSize:12,cursor:"pointer",padding:"6px 12px",fontFamily:"inherit"}} onClick={onEditList}>⚙️ 编辑礼物库</button>
+          <button style={{background:"none",border:"none",color:"#B09070",fontSize:12,cursor:"pointer",padding:"6px 12px",fontFamily:"inherit"}} onClick={onEditList}>{t("⚙️ 编辑礼物库","⚙️ Edit Library")}</button>
         </div>
       </div>
     </div>
