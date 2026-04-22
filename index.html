@@ -1020,12 +1020,12 @@ function App(){
     const h=s.habits.find(x=>x.id===hid);if(!h)return;
     let ns={...s,checkedHabits:{...s.checkedHabits,[today]:{...th,[hid]:!was}}};
     if(!was){
-      // Apply short stats (capped at 100)
+      // Apply short stats (capped 0~100, supports negative bonus)
       const sb=h.shortBonus||{};
       const newShort={};
       Object.keys(ns.shortStats).forEach(k=>{
         const add=sb[k]||0;
-        newShort[k]={...ns.shortStats[k],value:Math.min(100,ns.shortStats[k].value+add)};
+        newShort[k]={...ns.shortStats[k],value:Math.min(100,Math.max(0,ns.shortStats[k].value+add))};
       });
       ns.shortStats=newShort;
       // +1 flower (xp)
@@ -1045,8 +1045,8 @@ function App(){
       const sb=h.shortBonus||{};
       const newShort={};
       Object.keys(ns.shortStats).forEach(k=>{
-        const sub=sb[k]||0;
-        newShort[k]={...ns.shortStats[k],value:Math.max(0,ns.shortStats[k].value-sub)};
+        const add=sb[k]||0;
+        newShort[k]={...ns.shortStats[k],value:Math.min(100,Math.max(0,ns.shortStats[k].value-add))};
       });
       ns.shortStats=newShort;
       // -1 flower
@@ -1538,8 +1538,8 @@ const DAY_PALETTE = [
   "#f7f2ee","#ede1d9","#e0cdbf","#d3b7a3","#c49e83","#b68766","#a76f48","#9e6035","#99582a",
   // 黄色 (偏浅，参考色 #ffcb05 为第8位)
   "#fffbeb","#fff6d2","#ffefb4","#ffe994","#ffe16e","#ffda4b","#ffd228","#ffcb05","#c79e04",
-  // 绿色 (参考色 #4f772d 为最深)
-  "#f1f4ee","#dfe7d9","#cad6c0","#b3c5a5","#99b085","#809d68","#688a4a","#587e38","#4f772d",
+  // 绿色 (参考色 #6a994e 为最深)
+  "#f3f7f1","#e4eddf","#d2e0ca","#bfd3b3","#a9c498","#94b680","#7fa767","#719e57","#6a994e",
   // 青色 (参考色 #00a896 为最深)
   "#ebf8f7","#d1efec","#b3e5e0","#91dad2","#6bcdc2","#47c0b3","#24b4a5","#0dac9b","#00a896",
   // 蓝色 (参考色 #0077b6 为最深)
@@ -2303,7 +2303,7 @@ function BonusRow({stats,bonus,onChange}){
 function HabitEditor({habit,longStats,shortStats,onSave,onDelete}){
   const initD = migrateWeeklyBonus({...habit,weeklyBonus:habit.weeklyBonus||{stats:[]},weeklyTarget:habit.weeklyTarget||5,shortBonus:habit.shortBonus||{}});
   const [d,setD]=useState(initD);
-  const upShort=(key,val)=>{const nb={...d.shortBonus};val>0?nb[key]=val:delete nb[key];setD(p=>({...p,shortBonus:nb}));};
+  const upShort=(key,val)=>{const nb={...d.shortBonus};val!==0?nb[key]=val:delete nb[key];setD(p=>({...p,shortBonus:nb}));};
   const toggleStat=(k)=>{
     const cur=d.weeklyBonus?.stats||[];
     const next=cur.includes(k)?cur.filter(s=>s!==k):[...cur,k];
@@ -2336,11 +2336,11 @@ function HabitEditor({habit,longStats,shortStats,onSave,onDelete}){
           style={{width:38,height:38,borderRadius:10,border:`2px solid ${d.weeklyTarget===n?"#7BC67E":"#EDD9A3"}`,background:d.weeklyTarget===n?"#F0FFF0":"#FFFDF5",color:d.weeklyTarget===n?"#3A7D3E":"#B09070",fontWeight:d.weeklyTarget===n?900:600,cursor:"pointer",fontSize:13}}>{n}</button>
       ))}
     </div>
-    <FL>今日属性加成（心情/体力）</FL>
+    <FL>今日属性加减（心情/体力，负数为减分）</FL>
     <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
       {Object.entries(shortStats).map(([k,st])=>(
         <div key={k} style={S.bonusItem}><span style={{fontSize:15}}>{st.icon}</span><span style={{fontSize:11,color:"#7A5C44",fontWeight:700}}>{st.label}</span>
-          <input type="number" min="0" max="99" style={S.nudgeInp} value={d.shortBonus[k]||""} placeholder="0" onChange={e=>upShort(k,Number(e.target.value))}/></div>
+          <input type="number" min="-99" max="99" style={S.nudgeInp} value={d.shortBonus[k]||""} placeholder="0" onChange={e=>upShort(k,Number(e.target.value))}/></div>
       ))}
     </div>
     <button style={S.cfmBtn} onClick={()=>onSave(d)}>保存</button>
