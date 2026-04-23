@@ -630,14 +630,14 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
     ["#1e1845","#0d0d28","#2E3E34","#3A5040"], // 4 黎明前
     ["#0d1a3a","#1a3a6a","#354840","#4A6050"], // 5 破晓（高空深蓝黑，地平线靛蓝光带）
     ["#1a3a6a","#ff6b35","#3D5A40","#527A55"], // 6 日出前（高空深蓝，地平线橙红）
-    ["#8ab4d8","#ffaa60","#3E6040","#559060"], // 7 清晨（高空浅蓝，地平线暖橙）
-    ["#b0e0ff","#87ceeb","#426844","#5A9A5E"], // 8 上午
-    ["#a8d8f0","#5bacd8","#4A7A4A","#6AAE6A"], // 9 上午
-    ["#8dcfee","#3d9bd5","#4E8050","#6EBA6E"], // 10 上午
-    ["#7bc4e8","#2e8bc0","#508452","#70BE70"], // 11 上午
-    ["#64b8e0","#1e78b4","#528654","#72C072"], // 12 正午
-    ["#70c0e0","#2080bc","#508452","#70BE70"], // 13 午后
-    ["#7acae0","#2e8bc0","#4E8050","#6EBA6E"], // 14 午后
+    ["#8ab4d8","#ffaa60","#3E6040","#559060"], // 7 清晨（高空蓝灰，地平线暖橙）
+    ["#a0cce8","#b8d8f0","#426844","#5A9A5E"], // 8 上午（橙色退去，天空转蓝白）
+    ["#90c4e8","#5ab0d8","#4A7A4A","#6AAE6A"], // 9 上午（蓝色加深）
+    ["#6ab8e8","#2e9ad5","#4E8050","#6EBA6E"], // 10 最蓝（饱和蓝巅峰）
+    ["#a8d8f4","#68bce0","#508452","#70BE70"], // 11 开始透明化（蓝→白过渡）
+    ["#e8f6ff","#a0d8f0","#528654","#72C072"], // 12 正午（开始漂白）
+    ["#e0f2fc","#98d0ec","#508452","#70BE70"], // 13 午后（仍偏白）
+    ["#cce8f8","#7abee0","#4E8050","#6EBA6E"], // 14 午后（开始回蓝）
     ["#90d0e8","#4a9cc8","#4C7C4E","#6CB46C"], // 15 下午
     ["#98cce0","#5a9ec8","#487848","#68AA68"], // 16 下午（普通蓝天，略偏暖）
     ["#6aaad0","#ffcc88","#456040","#608860"], // 17 黄昏开始（高空蓝，地平线暖黄）
@@ -660,28 +660,40 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
       <div style={{position:"absolute",inset:0,background:`linear-gradient(180deg,${sTop} 0%,${sBot} 100%)`}}/>
 
       {/* clouds */}
-      <svg style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",overflow:"visible"}} viewBox="0 0 390 200" preserveAspectRatio="xMidYMid slice">
+      <svg style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",overflow:"visible"}} viewBox="0 0 390 240" preserveAspectRatio="xMidYMid slice">
+        {/* sun */}
+        {!isNight&&(()=>{
+          const isLow = isSunrise || isEvening;
+          const cx = 48;
+          const cy = isLow ? 130 : 52;
+          const r  = isLow ? 18 : 14;
+          const color = isSunrise ? "#FFB040" : isEvening ? "#FF8C30" : "#FFD966";
+          const glowColor = isSunrise ? "#FF900040" : isEvening ? "#FF700040" : "#FFD96640";
+          return <g>
+            <circle cx={cx} cy={cy} r={r+8} fill={glowColor}/>
+            <circle cx={cx} cy={cy} r={r} fill={color} opacity=".95"/>
+          </g>;
+        })()}
+
         {!isNight&&!isSunrise&&<>
-          <g opacity=".9"><ellipse cx="60" cy="45" rx="32" ry="18" fill="#fff"/><ellipse cx="80" cy="38" rx="24" ry="16" fill="#fff"/><ellipse cx="40" cy="42" rx="20" ry="14" fill="#fff"/></g>
-          <g opacity=".8"><ellipse cx="280" cy="32" rx="26" ry="15" fill="#fff"/><ellipse cx="300" cy="26" rx="20" ry="13" fill="#fff"/><ellipse cx="262" cy="30" rx="16" ry="11" fill="#fff"/></g>
+          <g opacity=".9"><ellipse cx="180" cy="58" rx="32" ry="18" fill="#fff"/><ellipse cx="200" cy="51" rx="24" ry="16" fill="#fff"/><ellipse cx="160" cy="55" rx="20" ry="14" fill="#fff"/></g>
+          <g opacity=".8"><ellipse cx="310" cy="52" rx="26" ry="15" fill="#fff"/><ellipse cx="330" cy="46" rx="20" ry="13" fill="#fff"/><ellipse cx="292" cy="50" rx="16" ry="11" fill="#fff"/></g>
         </>}
         {isSunrise&&<>
-          <g opacity=".7"><ellipse cx="60" cy="45" rx="32" ry="18" fill="#FFE0C0"/><ellipse cx="80" cy="38" rx="24" ry="16" fill="#FFD0A0"/><ellipse cx="40" cy="42" rx="20" ry="14" fill="#FFE0C0"/></g>
-          <g opacity=".6"><ellipse cx="280" cy="32" rx="26" ry="15" fill="#FFD0B0"/><ellipse cx="300" cy="26" rx="20" ry="13" fill="#FFC090"/><ellipse cx="262" cy="30" rx="16" ry="11" fill="#FFD0B0"/></g>
+          <g opacity=".7"><ellipse cx="180" cy="58" rx="32" ry="18" fill="#FFE0C0"/><ellipse cx="200" cy="51" rx="24" ry="16" fill="#FFD0A0"/><ellipse cx="160" cy="55" rx="20" ry="14" fill="#FFE0C0"/></g>
+          <g opacity=".6"><ellipse cx="310" cy="52" rx="26" ry="15" fill="#FFD0B0"/><ellipse cx="330" cy="46" rx="20" ry="13" fill="#FFC090"/><ellipse cx="292" cy="50" rx="16" ry="11" fill="#FFD0B0"/></g>
         </>}
         {isNight&&<>
           <circle cx="60" cy="30" r="8" fill="#FFF9C4" opacity=".9"/>
           <circle cx="63" cy="29" r="7" fill={sTop}/>
           {[[120,20],[200,40],[310,15],[350,35]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r="1.5" fill="#FFF9C4" opacity=".8"/>)}
           {[[80,50],[160,25],[250,55],[330,28]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r="1" fill="#FFF9C4" opacity=".6"/>)}
-        </>}
-
-        {/* hills / ground */}
-        <path d="M0,160 Q60,120 130,145 Q200,170 280,130 Q340,105 390,140 L390,200 L0,200Z" fill={gC}/>
-        <path d="M0,175 Q80,155 170,168 Q260,180 390,162 L390,200 L0,200Z" fill={grC}/>
+        </>}        {/* hills / ground */}
+        <path d="M0,200 Q60,160 130,185 Q200,210 280,170 Q340,145 390,180 L390,240 L0,240Z" fill={gC}/>
+        <path d="M0,215 Q80,195 170,208 Q260,220 390,202 L390,240 L0,240Z" fill={grC}/>
 
         {/* decorative trees */}
-        <g transform="translate(18,120)">
+        <g transform="translate(4,160)">
           <rect x="-4" y="24" width="8" height="18" rx="4" fill="#A86440"/>
           <circle cx="0" cy="14" r="18" fill="#5BAF5F"/>
           <circle cx="0" cy="10" r="14" fill="#7BC67E"/>
@@ -689,15 +701,15 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
           <circle cx="4" cy="18" r="11" fill="#62C96A"/>
           <circle cx="-5" cy="6" r="6" fill="rgba(255,255,255,.15)"/>
         </g>
-        <g transform="translate(355,115)">
+        <g transform="translate(355,155)">
           <rect x="-3" y="20" width="7" height="15" rx="3" fill="#A86440"/>
           <circle cx="0" cy="12" r="16" fill="#4A9650"/>
           <circle cx="0" cy="8" r="12" fill="#62C96A"/>
           <circle cx="-4" cy="7" r="5" fill="rgba(255,255,255,.15)"/>
         </g>
 
-        {/* flower decorations — kept well inside the ground strip */}
-        {[[55,168],[130,172],[240,166],[310,170]].map(([x,y],i)=>(
+        {/* flower decorations */}
+        {[[55,208],[130,212],[240,206],[310,210]].map(([x,y],i)=>(
           <g key={i} transform={`translate(${x},${y})`}>
             {[0,72,144,216,288].map(a=><ellipse key={a} cx={Math.cos(a*Math.PI/180)*4} cy={Math.sin(a*Math.PI/180)*4} rx="2.5" ry="1.8" fill={["#FF9B9B","#FFD166","#FF9BDE","#B8F5A8","#9BDEFF"][i]}/>)}
             <circle cx="0" cy="0" r="2.5" fill="#FFF"/>
@@ -705,9 +717,9 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
         ))}
 
         {/* leaf decorations on ground */}
-        <Leaf x={90} y={168} r={20} s={.7} c="#6BC870"/>
-        <Leaf x={195} y={172} r={-15} s={.65} c="#5BAF5F"/>
-        <Leaf x={340} y={166} r={30} s={.8} c="#6BC870"/>
+        <Leaf x={90} y={208} r={20} s={.7} c="#6BC870"/>
+        <Leaf x={195} y={212} r={-15} s={.65} c="#5BAF5F"/>
+        <Leaf x={340} y={206} r={30} s={.8} c="#6BC870"/>
       </svg>
 
       {/* content overlay */}
@@ -1213,7 +1225,7 @@ function App(){
       const ev={id:Date.now(),date:todayKey(),text:evForm.text,xp:evXp,statChanges:evForm.changes,tag:evForm.tag||""};
       const{longStats:newLong,extraFlowers}=applyLongWithOverflow(s.longStats,lc);
       let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+evXp+extraFlowers,s.player.level,s.player.xpNext,s.badges);
-      if(s.player.level===lv)pop("📝 岛史档案更新中……");
+      if(s.player.level===lv)pop("📝 岛上新闻更新中……");
       else{if(latestBadge)setNewBadge(latestBadge);}
       save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,bigEvents:[...s.bigEvents,ev].slice(-2000),longStats:newLong,shortStats:applyB(s.shortStats,sc)});
     }
@@ -1317,7 +1329,7 @@ function App(){
             <CollapsibleRescueSection s={s} save={save} pop={pop}/>
             <div style={S.settingSection}>
               <div style={S.cl}>💾 数据管理</div>
-              <div style={{fontSize:12,color:"#B09070",marginBottom:10}}>包含离岛旅行、岛史档案、历史记录等全部数据</div>
+              <div style={{fontSize:12,color:"#B09070",marginBottom:10}}>包含离岛旅行、岛上新闻、历史记录等全部数据</div>
               <button style={{...S.cfmBtn,marginBottom:10}} onClick={()=>exportData(s)}>{t("📤 导出数据备份","📤 Export Backup")}</button>
               <button style={{...S.cfmBtn,background:"linear-gradient(135deg,#70B8E0,#5BAF5F)"}} onClick={()=>importRef.current?.click()}>{t("📥 导入数据","📥 Import Data")}</button>
               <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={e=>{if(!e.target.files[0])return;importData(e.target.files[0],handleImport,err=>pop(`❌ 导入失败：${err}`));e.target.value="";}}/>
@@ -1478,7 +1490,7 @@ function App(){
         {tab==="habits"&&(
           <>
           {/* 今日打卡 FIRST */}
-          <ACCard title={t("🌻 今日打卡","🌻 Today")} action={<button style={S.plusBtn} onClick={()=>{setHabEdit({id:"",label:"",icon:"⭐",weeklyBonus:{stats:[]},weeklyTarget:5,shortBonus:{}});setModal("habit");}}>{t("＋ 新增","＋ Add")}</button>}>
+          <ACCard title={t("🐠 今日打卡","🌻 Today")} action={<button style={S.plusBtn} onClick={()=>{setHabEdit({id:"",label:"",icon:"⭐",weeklyBonus:{stats:[]},weeklyTarget:5,shortBonus:{}});setModal("habit");}}>{t("＋ 新增","＋ Add")}</button>}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
               {s.habits.map(h=>{
                 const done=!!th[h.id];
@@ -1504,7 +1516,7 @@ function App(){
           {/* 本周进度 SECOND */}
           <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📅 本周进度</div>
+              <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🐙 本周进度</div>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {s.habits.map(h=>{
@@ -1543,7 +1555,7 @@ function App(){
           />
 
           {/* badge collection */}
-          <ACCard title="⛵️ 离岛旅行" action={<span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{badges.length} 枚</span>}>
+          <ACCard title="⛵️ 离岛旅行" action={<span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{badges.length} 张</span>}>
             {badges.length===0
               ?<div style={S.empty}>升级后将获得离岛旅行船票 🌍<br/><span style={{fontSize:11}}>每100🌸升一级</span></div>
               :<BadgeCollection badges={badges}/>
@@ -2022,7 +2034,7 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
     <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
       {/* header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📜 岛史档案</div>
+        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📰 岛上新闻</div>
         <button style={S.plusBtn} onClick={onAdd}>{t("＋ 记录","＋ Add")}</button>
       </div>
 
@@ -2441,7 +2453,7 @@ function HabitEditor({habit,longStats,shortStats,onSave,onDelete}){
   };
   const curStats=d.weeklyBonus?.stats||[];
   return<>
-    <div style={S.dH}>{habit.id?"编辑打卡项 ✏️":"新建打卡项 🌱"}</div>
+    <div style={S.dH}>{habit.id?"🐣 编辑打卡项":"🐣 新的伙伴来了"}</div>
     <FL>名称</FL>
     <input style={S.inp} placeholder="例：运动" value={d.label} onChange={e=>setD(p=>({...p,label:e.target.value}))}/>
     <FL>主页 Emoji</FL>
@@ -2505,7 +2517,7 @@ const S={
   tOn:     {background:"#F0FFF0",border:"2px solid #7BC67E",color:"#3A7D3E",fontWeight:900},
   inp:     {width:"100%",background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:14,color:"#3D2B1F",padding:"12px 16px",fontSize:15,marginBottom:6,display:"block",fontFamily:"inherit"},
   bonusItem:{display:"flex",alignItems:"center",gap:5,background:"#F8FFF8",borderRadius:12,padding:"7px 10px",border:"1.5px solid #D4EED4"},
-  nudgeInp:{width:62,background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:8,color:"#3D2B1F",padding:"4px 6px",fontSize:14,textAlign:"center"},
+  nudgeInp:{width:50,background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:8,color:"#3D2B1F",padding:"4px 6px",fontSize:14,textAlign:"center"},
   settingSection:{marginBottom:16,paddingBottom:16,borderBottom:"2px dashed #EDD9A3"},
   settingRow:{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1.5px dashed #EDD9A3"},
 };
