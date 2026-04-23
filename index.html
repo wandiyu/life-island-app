@@ -238,7 +238,31 @@ const todayKey = () => new Date().toLocaleDateString("zh-CN", { year:"numeric", 
 const nowHour  = () => new Date().getHours();
 const weekKey  = d => { const dt=new Date(d||Date.now()); const y=dt.getFullYear(); const s=new Date(y,0,1); return `${y}-W${Math.ceil(((dt-s)/86400000+s.getDay()+1)/7)}`; };
 const monthKey = d => { const dt=new Date(d||Date.now()); return `${dt.getFullYear()}-${dt.getMonth()+1}`; };
-const canDoR   = q => { if (!q.lastDone) return true; if (q.period==="weekly") return weekKey()!==weekKey(q.lastDone); if (q.period==="monthly") return monthKey()!==monthKey(q.lastDone); return true; };
+const canDoR   = q => {
+  if (!q.lastDone) return true;
+  const now = new Date();
+  const last = new Date(q.lastDone);
+  if (q.period === "weekly") {
+    // 找上一个周日05:00作为重置时间点
+    const resetDay = new Date(now);
+    resetDay.setHours(5,0,0,0);
+    const dow = resetDay.getDay(); // 0=Sun
+    resetDay.setDate(resetDay.getDate() - dow); // 回到本周日05:00
+    // 如果现在还没到本周日05:00，则取上周日05:00
+    if (now < resetDay) resetDay.setDate(resetDay.getDate() - 7);
+    return last < resetDay;
+  }
+  if (q.period === "monthly") {
+    // 本月1日05:00
+    const resetDay = new Date(now.getFullYear(), now.getMonth(), 1, 5, 0, 0, 0);
+    if (now < resetDay) {
+      // 还没到本月1日05:00，取上月1日05:00
+      resetDay.setMonth(resetDay.getMonth() - 1);
+    }
+    return last < resetDay;
+  }
+  return true;
+};
 
 // ─── badge system ────────────────────────────────────────
 const BADGE_LANDMARKS = [
@@ -534,34 +558,65 @@ const Leaf=({x,y,r=0,s=1,c="#7BC67E"})=>(
 function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift}){
   const t=useT();
   const hour=new Date().getHours();
-  const isNight=hour<6||hour>=20;
-  const isEvening=hour>=17&&hour<20;
-  const skyTop=isNight?"#1A2A4A":isEvening?"#FF8C5A":"#AEE6F8";
-  const skyBot=isNight?"#2A3A6A":isEvening?"#FFB870":"#D4F0FF";
-  const groundC=isNight?"#3A7040":isEvening?"#4A8A50":"#5BAF5F";
-  const grassC =isNight?"#4A9050":isEvening?"#5ABF60":"#7BC67E";
+
+  // 24小时天空颜色表 [skyTop(高空), skyBot(地平线), groundC, grassC]
+  const SKY_HOURS = [
+    ["#1a1a3e","#0a0a1a","#2A3A30","#354A38"], // 0 深夜
+    ["#141432","#080818","#2A3A30","#354A38"], // 1 深夜
+    ["#10102a","#080818","#2A3A30","#354A38"], // 2 深夜
+    ["#141428","#0a0a1e","#2A3A30","#354A38"], // 3 深夜
+    ["#1e1845","#0d0d28","#2E3E34","#3A5040"], // 4 黎明前
+    ["#0d1a3a","#1a3a6a","#354840","#4A6050"], // 5 破晓（高空深蓝黑，地平线靛蓝光带）
+    ["#1a3a6a","#ff6b35","#3D5A40","#527A55"], // 6 日出前（高空深蓝，地平线橙红）
+    ["#8ab4d8","#ffaa60","#3E6040","#559060"], // 7 清晨（高空浅蓝，地平线暖橙）
+    ["#b0e0ff","#87ceeb","#426844","#5A9A5E"], // 8 上午
+    ["#a8d8f0","#5bacd8","#4A7A4A","#6AAE6A"], // 9 上午
+    ["#8dcfee","#3d9bd5","#4E8050","#6EBA6E"], // 10 上午
+    ["#7bc4e8","#2e8bc0","#508452","#70BE70"], // 11 上午
+    ["#64b8e0","#1e78b4","#528654","#72C072"], // 12 正午
+    ["#70c0e0","#2080bc","#508452","#70BE70"], // 13 午后
+    ["#7acae0","#2e8bc0","#4E8050","#6EBA6E"], // 14 午后
+    ["#90d0e8","#4a9cc8","#4C7C4E","#6CB46C"], // 15 下午
+    ["#98cce0","#5a9ec8","#487848","#68AA68"], // 16 下午（普通蓝天，略偏暖）
+    ["#6aaad0","#ffcc88","#456040","#608860"], // 17 黄昏开始（高空蓝，地平线暖黄）
+    ["#3a7ab0","#e8703a","#3E5A3C","#587A58"], // 18 日落（高空深蓝，地平线橙红）
+    ["#2a5a8a","#d05040","#384E38","#4E6A4E"], // 19 晚霞（高空夜蓝，地平线暖红橙）
+    ["#1a3a6a","#904060","#304030","#405840"], // 20 晚霞尾声（高空深蓝，地平线玫红渐退）
+    ["#1a4a8a","#0d2a5a","#2C3C2E","#3C5040"], // 21 宝石蓝夜空
+    ["#1a3a6a","#0a1a3a","#2A3A2C","#384A3C"], // 22 深宝石蓝
+    ["#1a1038","#0c0820","#282E2A","#344038"], // 23 深夜
+  ];
+
+  const [sTop,sBot,gC,grC] = SKY_HOURS[hour];
+  const isNight = hour<6||hour>=20;
+  const isEvening = hour>=17&&hour<20;
+  const isSunrise = hour>=6&&hour<9;
 
   return(
     <div style={{position:"relative",overflow:"hidden",userSelect:"none"}}>
       {/* sky gradient */}
-      <div style={{position:"absolute",inset:0,background:`linear-gradient(180deg,${skyTop} 0%,${skyBot} 100%)`}}/>
+      <div style={{position:"absolute",inset:0,background:`linear-gradient(180deg,${sTop} 0%,${sBot} 100%)`}}/>
 
       {/* clouds */}
       <svg style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",overflow:"visible"}} viewBox="0 0 390 200" preserveAspectRatio="xMidYMid slice">
-        {!isNight&&<>
+        {!isNight&&!isSunrise&&<>
           <g opacity=".9"><ellipse cx="60" cy="45" rx="32" ry="18" fill="#fff"/><ellipse cx="80" cy="38" rx="24" ry="16" fill="#fff"/><ellipse cx="40" cy="42" rx="20" ry="14" fill="#fff"/></g>
           <g opacity=".8"><ellipse cx="280" cy="32" rx="26" ry="15" fill="#fff"/><ellipse cx="300" cy="26" rx="20" ry="13" fill="#fff"/><ellipse cx="262" cy="30" rx="16" ry="11" fill="#fff"/></g>
         </>}
+        {isSunrise&&<>
+          <g opacity=".7"><ellipse cx="60" cy="45" rx="32" ry="18" fill="#FFE0C0"/><ellipse cx="80" cy="38" rx="24" ry="16" fill="#FFD0A0"/><ellipse cx="40" cy="42" rx="20" ry="14" fill="#FFE0C0"/></g>
+          <g opacity=".6"><ellipse cx="280" cy="32" rx="26" ry="15" fill="#FFD0B0"/><ellipse cx="300" cy="26" rx="20" ry="13" fill="#FFC090"/><ellipse cx="262" cy="30" rx="16" ry="11" fill="#FFD0B0"/></g>
+        </>}
         {isNight&&<>
           <circle cx="60" cy="30" r="8" fill="#FFF9C4" opacity=".9"/>
-          <circle cx="63" cy="29" r="7" fill={skyTop}/>
+          <circle cx="63" cy="29" r="7" fill={sTop}/>
           {[[120,20],[200,40],[310,15],[350,35]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r="1.5" fill="#FFF9C4" opacity=".8"/>)}
           {[[80,50],[160,25],[250,55],[330,28]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r="1" fill="#FFF9C4" opacity=".6"/>)}
         </>}
 
         {/* hills / ground */}
-        <path d="M0,160 Q60,120 130,145 Q200,170 280,130 Q340,105 390,140 L390,200 L0,200Z" fill={groundC}/>
-        <path d="M0,175 Q80,155 170,168 Q260,180 390,162 L390,200 L0,200Z" fill={grassC}/>
+        <path d="M0,160 Q60,120 130,145 Q200,170 280,130 Q340,105 390,140 L390,200 L0,200Z" fill={gC}/>
+        <path d="M0,175 Q80,155 170,168 Q260,180 390,162 L390,200 L0,200Z" fill={grC}/>
 
         {/* decorative trees */}
         <g transform="translate(18,120)">
@@ -1327,15 +1382,18 @@ function App(){
             {s.recurringQuests.map(q=>{
               const ok=canDoR(q);
               const lastDoneStr=q.lastDone?new Date(q.lastDone).toLocaleDateString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
-              return<div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
+              return<div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3",opacity:ok?1:0.45}}>
                 <div style={{flex:1}}>
                   <div style={{fontSize:14,fontWeight:800,marginBottom:3}}>🔄 {q.title}</div>
-                  <div style={{fontSize:10,color:"#B09070",marginBottom:2}}>{q.period==="weekly"?"每周":"每月"}{lastDoneStr&&` · 上次：${lastDoneStr}`}</div>
+                  <div style={{fontSize:10,color:"#B09070",marginBottom:2}}>{q.period==="weekly"?"每周日重置":"每月1日重置"}{lastDoneStr&&` · 上次：${lastDoneStr}`}</div>
                   {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
                   <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
                 </div>
                 <div style={{display:"flex",gap:6,flexShrink:0}}>
-                  <button style={S.dBtn} onClick={()=>completeRecurring(q.id)}>完成</button>
+                  {ok
+                    ?<button style={S.dBtn} onClick={()=>completeRecurring(q.id)}>完成</button>
+                    :<button style={{...S.dBtn,opacity:0.45,cursor:"not-allowed"}} disabled>完成</button>
+                  }
                   <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
                 </div>
               </div>;
