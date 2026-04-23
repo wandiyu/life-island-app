@@ -1213,7 +1213,7 @@ function App(){
       const ev={id:Date.now(),date:todayKey(),text:evForm.text,xp:evXp,statChanges:evForm.changes,tag:evForm.tag||""};
       const{longStats:newLong,extraFlowers}=applyLongWithOverflow(s.longStats,lc);
       let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+evXp+extraFlowers,s.player.level,s.player.xpNext,s.badges);
-      if(s.player.level===lv)pop("📝 大事已记录");
+      if(s.player.level===lv)pop("📝 岛史档案更新中……");
       else{if(latestBadge)setNewBadge(latestBadge);}
       save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,bigEvents:[...s.bigEvents,ev].slice(-2000),longStats:newLong,shortStats:applyB(s.shortStats,sc)});
     }
@@ -1381,7 +1381,7 @@ function App(){
                 </div>
               ))}
             </div>
-            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>{t("点击属性 → 记录大事并调整数值","Tap stat → log event & adjust")}</div>
+            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>{t("点击属性记录","Tap stat to log")}</div>
           </ACCard>
           {/* short stats */}
           <ACCard title="🌤️ 今日天气">
@@ -1545,7 +1545,7 @@ function App(){
           {/* badge collection */}
           <ACCard title="⛵️ 离岛旅行" action={<span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{badges.length} 枚</span>}>
             {badges.length===0
-              ?<div style={S.empty}>升级后将获得世界景点徽章 🌍<br/><span style={{fontSize:11}}>每100🌸升一级</span></div>
+              ?<div style={S.empty}>升级后将获得离岛旅行船票 🌍<br/><span style={{fontSize:11}}>每100🌸升一级</span></div>
               :<BadgeCollection badges={badges}/>
             }
           </ACCard>
@@ -1614,7 +1614,7 @@ function App(){
       {modal==="bigEvent"&&evForm&&(
         <Drawer onClose={()=>{setModal(null);setEvForm(null);}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-            <div style={S.dH}>{evForm.id?"✏️ 编辑大事":"📝 记录一件大事"}</div>
+            <div style={S.dH}>{evForm.id?"✏️ 编辑大事":"🏝️ 小岛上发生了"}</div>
             {evForm.id&&<button style={{...S.xBtn,fontSize:12,padding:"6px 12px"}} onClick={()=>{save({...s,bigEvents:s.bigEvents.filter(e=>e.id!==evForm.id)});setModal(null);setEvForm(null);pop("🗑️ 已删除");}}>删除</button>}
           </div>
           <FL>类型标签</FL>
@@ -1989,9 +1989,7 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap
               ))}
             </div>
           )}
-          {selectedEvents.length===0&&(
-            <div style={{fontSize:12,color:"#C8A880",textAlign:"center",padding:"6px 0"}}>这一天没有大事记录</div>
-          )}
+          {selectedEvents.length===0&&null}
         </div>
       )}
     </div>
