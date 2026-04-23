@@ -2294,8 +2294,8 @@ function BonusRow({stats,bonus,onChange}){
       <div key={k} style={S.bonusItem}>
         <span style={{fontSize:15}}>{st.icon}</span>
         <span style={{fontSize:11,color:"#7A5C44",fontWeight:700}}>{st.label}</span>
-        <input type="number" min="0" max="99" style={S.nudgeInp} value={bonus[k]||""} placeholder="0"
-          onChange={e=>{const v=Number(e.target.value);const nb={...bonus};v?nb[k]=v:delete nb[k];onChange(nb);}}/>
+        <input type="number" min="-99" max="99" style={S.nudgeInp} value={bonus[k]||""} placeholder="0"
+          onChange={e=>{const v=Number(e.target.value);const nb={...bonus};v!==0?nb[k]=v:delete nb[k];onChange(nb);}}/>
       </div>
     ))}
   </div>;
@@ -2375,7 +2375,7 @@ const S={
   tOn:     {background:"#F0FFF0",border:"2px solid #7BC67E",color:"#3A7D3E",fontWeight:900},
   inp:     {width:"100%",background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:14,color:"#3D2B1F",padding:"12px 16px",fontSize:15,marginBottom:6,display:"block",fontFamily:"inherit"},
   bonusItem:{display:"flex",alignItems:"center",gap:5,background:"#F8FFF8",borderRadius:12,padding:"7px 10px",border:"1.5px solid #D4EED4"},
-  nudgeInp:{width:46,background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:8,color:"#3D2B1F",padding:"4px 6px",fontSize:14,textAlign:"center"},
+  nudgeInp:{width:62,background:"#FFFDF5",border:"2px solid #EDD9A3",borderRadius:8,color:"#3D2B1F",padding:"4px 6px",fontSize:14,textAlign:"center"},
   settingSection:{marginBottom:16,paddingBottom:16,borderBottom:"2px dashed #EDD9A3"},
   settingRow:{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1.5px dashed #EDD9A3"},
 };
