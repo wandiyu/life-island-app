@@ -409,7 +409,7 @@ const INIT={
   badges:         [],
   dayColors:      {},   // dateKey → hex color chosen by user
   daySummaries:   {},   // dateKey → one-line summary string
-  eventTags:      ["担心","开心","感恩","反思","突破"],  // user-editable
+  eventTags:      ["担心","开心","感恩","反思","突破","座右铭"],  // user-editable
   motto:          "生活是一场冒险，每天都是新的探索 🌿",
   letter:         "",
   bigEvents:      [],
@@ -510,6 +510,68 @@ const rwdTxt=(r={},ls=DEF_LONG,ss=DEF_SHORT)=>{
   Object.entries(r.short||{}).forEach(([k,v])=>{if(v)p.push(`${ss[k]?.icon||""}+${v}`)});
   return p.join("  ");
 };
+
+// ─── narrative toasts ────────────────────────────────────
+const randPick=arr=>arr[Math.floor(Math.random()*arr.length)];
+const HABIT_TOASTS=[
+  (icon,label)=>`${icon} ${label} ｜ 小岛开出一朵小花 🌸+1`,
+  (icon,label)=>`${icon} ${label} ｜ 小岛感谢你 🌸+1`,
+  (icon,label)=>`${icon} ${label} ｜ 岛上某处悄悄发芽了 🌸+1`,
+  (icon,label)=>`${icon} ${label} ｜ 海龟点了点头 🌸+1`,
+  (icon,label)=>`${icon} ${label} ｜ 螃蟹横着走来道谢 🌸+1`,
+  (icon,label)=>`${icon} ${label} ｜ 海鸥在头顶盘旋了一圈 🌸+1`,
+  (icon,label)=>`${icon} ${label} ｜ 小狐狸从树后探出头来 🌸+1`,
+  (icon,label)=>`${icon} ${label} ｜ 寄居蟹搬来了新家 🌸+1`,
+  (icon,label)=>`${icon} ${label} ｜ 蝴蝶停在你肩上片刻 🌸+1`,
+  (icon,label)=>`${icon} ${label} ｜ 萤火虫提前亮起来了 🌸+1`,
+];
+const ALLDONE_TOASTS=[
+  "🎉 今日全部完成！岛上炊烟升起，丰收之夜 🌸+11",
+  "🎉 今日全部完成！星星都出来庆祝了 🌸+11",
+  "🎉 今日全部完成！海风特别温柔的一天 🌸+11",
+  "🎉 今日全部完成！岛上的花都开了 🌸+11",
+];
+const LEVELUP_TOASTS=[
+  (lv)=>`🗺️ 解锁了新的离岛旅行！Lv.${lv}`,
+  (lv)=>`⛵️ 新的岛屿向你敞开了！Lv.${lv}`,
+  (lv)=>`🌊 远方又多了一处可以抵达的地方！Lv.${lv}`,
+  (lv)=>`🧭 地图上亮起了一个新地点！Lv.${lv}`,
+];
+const MAIN_TOASTS=[
+  "🌵 荒地开辟成功！发现了一片野生果园",
+  "🌵 荒地开辟成功！地下似乎埋着什么……",
+  "🌵 荒地开辟成功！这里的土壤出奇地肥沃",
+  "🌵 荒地开辟成功！远处有烟，或许还有其他岛民",
+];
+const SIDE_TOASTS=[
+  "🌳 任务完成！树苗已经扎根，来日可期",
+  "🌳 任务完成！附近的鸟儿开始在这里筑巢",
+  "🌳 任务完成！风从树梢吹过，岛上又多了一片绿",
+  "🌳 任务完成！也许多年后有人会在这棵树下乘凉",
+];
+const RECURRING_TOASTS=[
+  ()=>`💦 浇水任务完成！植物们喝饱了，今晚会长高一点点`,
+  ()=>`💦 浇水任务完成！根系在地下悄悄延伸`,
+  ()=>`💦 浇水任务完成！土壤湿润了，空气里有雨后的味道`,
+  ()=>`💦 浇水任务完成！它们记得你来过`,
+];
+const GIFT_CONTAINERS=[
+  (item)=>`🍶 漂流瓶里写着\n${item}`,
+  (item)=>`🗺️ 旧地图的背面写着\n${item}`,
+  (item)=>`🌊 海浪冲来一张纸条\n${item}`,
+  (item)=>`🪵 树洞里藏着一张字条\n${item}`,
+  (item)=>`🐚 贝壳里传来一段话\n${item}`,
+  (item)=>`⚓️ 锚链上绑着一张纸\n${item}`,
+  (item)=>`🌙 月光下显出一行字\n${item}`,
+  (item)=>`🦅 信使鸟带来一封信\n${item}`,
+  (item)=>`🪨 礁石上刻着\n${item}`,
+  (item)=>`🌿 藤蔓缠着一卷纸\n${item}`,
+  (item)=>`🏺 沙滩上埋着一个罐子，里面写着\n${item}`,
+  (item)=>`🌅 晨雾散去，沙滩上留着一行字\n${item}`,
+];
+const GIFT_TRIGGERS=[
+  "你收到了一份礼物",
+];
 
 // ─── import/export ───────────────────────────────────────
 const exportData=s=>{
@@ -961,7 +1023,8 @@ function App(){
     if(!d.dayColors)                  d.dayColors={};
     if(!d.daySummaries)               d.daySummaries={};
     if(!d.motto)                      d.motto="生活是一场冒险，每天都是新的探索 🌿";
-    if(!d.eventTags)                  d.eventTags=["担心","开心","感恩","反思","突破"];
+    if(!d.eventTags)                  d.eventTags=["担心","开心","感恩","反思","突破","座右铭"];
+    else if(!d.eventTags.includes("座右铭")) d.eventTags=[...d.eventTags,"座右铭"];
     if(!d.lastWeeklySettleDate)       d.lastWeeklySettleDate="";
     if(d.pendingWeeklyResult===undefined) d.pendingWeeklyResult=null;
     // Migrate longStats: add growth if missing
@@ -1037,8 +1100,10 @@ function App(){
     Object.keys(s.shortStats).forEach(k=>{if(r.short&&r.short[k])sc[k]=r.short[k];});
     const{longStats:newLong,extraFlowers}=applyLongWithOverflow(s.longStats,lc);
     let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+(r.xp||0)+extraFlowers,s.player.level,s.player.xpNext,s.badges);
-    if(s.player.level===lv)pop(`✅ 完成！${rwdTxt(r,s.longStats,s.shortStats)}`);
-    else{pop(`🎉 升级 Lv.${lv}！获得徽章！`);if(latestBadge)setNewBadge(latestBadge);}
+    const isMain=s.mainQuests.find(x=>x.id===id);
+    const toastMsg=isMain?randPick(MAIN_TOASTS):randPick(SIDE_TOASTS);
+    if(s.player.level===lv)pop(`${toastMsg} ${rwdTxt(r,s.longStats,s.shortStats)}`);
+    else{if(latestBadge)setNewBadge(latestBadge);}
     // 确保"任务"标签存在
     const existingTags=s.eventTags||[];
     const newTags=existingTags.includes("任务")?existingTags:[...existingTags,"任务"];
@@ -1063,8 +1128,8 @@ function App(){
     const r=q.reward||{};
     const gained=r.xp||0;
     let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+gained,s.player.level,s.player.xpNext,s.badges);
-    if(s.player.level===lv)pop(`✅ ${q.title} 完成！${rwdTxt(r,s.longStats,s.shortStats)}`);
-    else{pop(`🎉 升级 Lv.${lv}！获得徽章！`);if(latestBadge)setNewBadge(latestBadge);}
+    if(s.player.level===lv)pop(`${randPick(RECURRING_TOASTS)(q.title)} ${rwdTxt(r,s.longStats,s.shortStats)}`);
+    else{if(latestBadge)setNewBadge(latestBadge);}
     save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
       longStats:applyB(s.longStats,r.long||{}),shortStats:applyB(s.shortStats,r.short||{}),
       recurringQuests:s.recurringQuests.map(q2=>q2.id===id?{...q2,lastDone:new Date().toISOString()}:q2),
@@ -1089,11 +1154,11 @@ function App(){
       const newTh={...th,[hid]:true};
       const allDone=s.habits.length>0&&s.habits.every(x=>newTh[x.id]);
       if(allDone){
-        ns.player={...ns.player,xp:ns.player.xp+10}; // 已+1，再+10共+11
+        ns.player={...ns.player,xp:ns.player.xp+10};
         setTimeout(()=>setShowFirework(true),100);
-        pop(`🎉 今日全部完成！🌸+11`);
+        pop(randPick(ALLDONE_TOASTS));
       } else {
-        pop(`${h.icon} ${h.label} 完成！🌸+1`);
+        pop(randPick(HABIT_TOASTS)(h.icon,h.label));
       }
     } else {
       // Undo short stats
@@ -1149,7 +1214,7 @@ function App(){
       const{longStats:newLong,extraFlowers}=applyLongWithOverflow(s.longStats,lc);
       let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+evXp+extraFlowers,s.player.level,s.player.xpNext,s.badges);
       if(s.player.level===lv)pop("📝 大事已记录");
-      else{pop(`🎉 升级 Lv.${lv}！获得徽章！`);if(latestBadge)setNewBadge(latestBadge);}
+      else{if(latestBadge)setNewBadge(latestBadge);}
       save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,bigEvents:[...s.bigEvents,ev].slice(-2000),longStats:newLong,shortStats:applyB(s.shortStats,sc)});
     }
     setModal(null);setEvForm(null);
@@ -1173,7 +1238,7 @@ function App(){
   const badges=s.badges||[];
 
   const t=useT();
-  const TABS=[["home","🌱",t("主页","Home")],["quests","🌳",t("任务","Quests")],["habits","🌻",t("打卡","Check-in")],["log","🍃",t("记录","Log")]];
+  const TABS=[["home","🏝️",t("岛况","Home")],["quests","🌴",t("任务","Quests")],["habits","🐳",t("打卡","Check-in")],["log","🎨",t("岛记","Log")]];
 
   const toggleLang=()=>{const nl=lang==="zh"?"en":"zh";setLangState(nl);setLang(nl);};
   return(
@@ -1219,7 +1284,7 @@ function App(){
         <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:150,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setNewBadge(null)}>
           <div style={{background:"#FFFDF5",borderRadius:28,padding:"32px 28px",maxWidth:300,width:"90%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.25)",border:"3px solid #7BC67E"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:28,marginBottom:4}}>🎉</div>
-            <div style={{fontSize:14,color:"#5BAF5F",fontWeight:700,marginBottom:4}}>{t("升级啦！获得新徽章","Level up! New badge")}</div>
+            <div style={{fontSize:14,color:"#5BAF5F",fontWeight:700,marginBottom:4}}>{randPick(LEVELUP_TOASTS)(newBadge.level)}</div>
             <div style={{display:"flex",justifyContent:"center",margin:"16px 0",animation:"badgePop .5s ease"}}>
               <BadgeSVG name={newBadge.name} rarity={newBadge.rarity} size={90}/>
             </div>
@@ -1252,7 +1317,7 @@ function App(){
             <CollapsibleRescueSection s={s} save={save} pop={pop}/>
             <div style={S.settingSection}>
               <div style={S.cl}>💾 数据管理</div>
-              <div style={{fontSize:12,color:"#B09070",marginBottom:10}}>包含徽章、大事记录、历史记录等全部数据</div>
+              <div style={{fontSize:12,color:"#B09070",marginBottom:10}}>包含离岛旅行、岛史档案、历史记录等全部数据</div>
               <button style={{...S.cfmBtn,marginBottom:10}} onClick={()=>exportData(s)}>{t("📤 导出数据备份","📤 Export Backup")}</button>
               <button style={{...S.cfmBtn,background:"linear-gradient(135deg,#70B8E0,#5BAF5F)"}} onClick={()=>importRef.current?.click()}>{t("📥 导入数据","📥 Import Data")}</button>
               <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={e=>{if(!e.target.files[0])return;importData(e.target.files[0],handleImport,err=>pop(`❌ 导入失败：${err}`));e.target.value="";}}/>
@@ -1298,15 +1363,15 @@ function App(){
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:22}}>🍂</span>
                 <span style={{flex:1,fontSize:13,fontWeight:700,color:"#A06000"}}>{[lowMood&&"心情",lowEnergy&&"体力"].filter(Boolean).join("、")} 偏低，需要充充电！</span>
-                <button style={{background:"#FFD166",border:"none",color:"#7A4A00",borderRadius:14,padding:"7px 16px",fontSize:12,fontWeight:900,cursor:"pointer",boxShadow:"0 2px 8px rgba(255,209,102,.5)"}} onClick={()=>setModal("rescue")}>{t("拆礼物","Open Gift")}</button>
+                <button style={{background:"#FFD166",border:"none",color:"#7A4A00",borderRadius:14,padding:"7px 16px",fontSize:12,fontWeight:900,cursor:"pointer",boxShadow:"0 2px 8px rgba(255,209,102,.5)"}} onClick={()=>setModal("rescue")}>{randPick(GIFT_TRIGGERS)}</button>
               </div>
             </div>
           )}
           {/* long stats */}
-          <ACCard title="🌱 长期成长属性">
+          <ACCard title="🍊 岛屿物产">
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {Object.entries(s.longStats).map(([k,st])=>(
-                <div key={k} style={{background:"linear-gradient(145deg,#F8FFF8,#EEF8EE)",borderRadius:16,padding:"12px 10px",cursor:"pointer",border:"2px solid #C8E8C8",boxShadow:"0 2px 8px rgba(91,175,95,.1)"}} onClick={()=>{setEvForm({text:"",xp:0,changes:{}});setModal("bigEvent");}}>
+                <div key={k} style={{background:"linear-gradient(145deg,#F8FFF8,#EEF8EE)",borderRadius:16,padding:"12px 10px",cursor:"pointer",border:"2px solid #C8E8C8",boxShadow:"0 2px 8px rgba(91,175,95,.1)"}} onClick={()=>{setEvForm({text:"",xp:1,changes:{}});setModal("bigEvent");}}>
                   <div style={{fontSize:20,marginBottom:4}}>{st.icon}</div>
                   <div style={{fontSize:10,color:"#7A5C44",fontWeight:700,marginBottom:2}}>{st.label}</div>
                   <div style={{fontSize:26,fontWeight:900,lineHeight:1,marginBottom:6,color:st.color}}>{st.value}</div>
@@ -1319,12 +1384,12 @@ function App(){
             <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>{t("点击属性 → 记录大事并调整数值","Tap stat → log event & adjust")}</div>
           </ACCard>
           {/* short stats */}
-          <ACCard title="☀️ 今日状态">
+          <ACCard title="🌤️ 今日天气">
             <div style={{display:"flex",gap:10}}>
               {Object.entries(s.shortStats).map(([k,st])=>{
                 const low=st.value<s.rescueThreshold;
                 return(
-                  <div key={k} style={{flex:1,background:low?"linear-gradient(145deg,#FFFBDC,#FFF7C4)":"linear-gradient(145deg,#F8FFF8,#EEFFF0)",borderRadius:16,padding:"14px 12px",border:`2px solid ${low?"#FFD166":"#C8E8C8"}`,cursor:"pointer",boxShadow:low?"0 2px 10px rgba(255,209,102,.25)":"0 2px 8px rgba(91,175,95,.1)"}} onClick={()=>{setEvForm({text:"",xp:0,changes:{}});setModal("bigEvent");}}>
+                  <div key={k} style={{flex:1,background:low?"linear-gradient(145deg,#FFFBDC,#FFF7C4)":"linear-gradient(145deg,#F8FFF8,#EEFFF0)",borderRadius:16,padding:"14px 12px",border:`2px solid ${low?"#FFD166":"#C8E8C8"}`,cursor:"pointer",boxShadow:low?"0 2px 10px rgba(255,209,102,.25)":"0 2px 8px rgba(91,175,95,.1)"}} onClick={()=>{setEvForm({text:"",xp:1,changes:{}});setModal("bigEvent");}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
                       <span style={{fontSize:16}}>{st.icon}</span>
                       <span style={{fontSize:11,color:"#7A5C44",fontWeight:700}}>{st.label}</span>
@@ -1337,35 +1402,43 @@ function App(){
                 );
               })}
             </div>
-            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:6}}>每天 05:00 重置为80</div>
+            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:6}}>每天 05:00 天气重置</div>
           </ACCard>
           
           {/* motto */}
-          <ACCard title={t("🍃 座右铭","🍃 Motto")} action={
+          <ACCard title={t("🔮 岛主座右铭","🔮 Motto")} action={
             <button style={S.editTxtBtn} onClick={()=>{setMottoD(s.motto||"");setEditingMotto(true);}}>{t("编辑","Edit")}</button>
           }>
             {editingMotto
               ?<div>
                 <textarea style={{...S.inp,height:72,resize:"none",lineHeight:1.65,marginBottom:8}} value={mottoD} onChange={e=>setMottoD(e.target.value)} autoFocus/>
                 <div style={{display:"flex",gap:8}}>
-                  <button style={{...S.cfmBtn,flex:1,padding:"10px"}} onClick={()=>{save({...s,motto:mottoD});setEditingMotto(false);pop("🍃 座右铭已更新");}}>{t("保存","Save")}</button>
+                  <button style={{...S.cfmBtn,flex:1,padding:"10px"}} onClick={()=>{
+                    const existingTags=s.eventTags||[];
+                    const newTags=existingTags.includes("座右铭")?existingTags:[...existingTags,"座右铭"];
+                    const ev={id:Date.now(),date:todayKey(),text:`「${mottoD}」`,xp:1,statChanges:{},tag:"座右铭"};
+                    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+                    if(s.player.level!==lv){setNewBadge(latestBadge);}
+                    save({...s,motto:mottoD,eventTags:newTags,bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+                    setEditingMotto(false);pop("🔮 岛主座右铭已更新！🌸+1");
+                  }}>{t("保存","Save")}</button>
                   <button style={{...S.dBtn,padding:"10px 16px"}} onClick={()=>setEditingMotto(false)}>取消</button>
                 </div>
               </div>
-              :<div style={{fontSize:15,color:"#3D2B1F",lineHeight:1.75,fontWeight:700,background:"#F8FFF8",borderRadius:14,padding:"12px 16px",border:"2px dashed #C8E8C8",fontStyle:"italic"}}>{s.motto||t("点击「编辑」添加你的座右铭 🌿","Click Edit to add your motto 🌿")}</div>
+              :<div style={{fontSize:15,color:"#3D2B1F",lineHeight:1.75,fontWeight:700,background:"#F8FFF8",borderRadius:14,padding:"12px 16px",border:"2px dashed #C8E8C8",fontStyle:"italic"}}>{s.motto||t("点击「编辑」添加岛主座右铭 🔮","Click Edit to add your motto 🌿")}</div>
             }
           </ACCard>
         </>}
 
         {/* ── 任务 ── */}
         {tab==="quests"&&<>
-          {[["main","🌳 种树任务",s.mainQuests],["side","🗺️ 探索任务",s.sideQuests]].map(([type,label,list])=>(
+          {[["main","🌵 开荒主线",s.mainQuests,"🌵"],["side","🌳 种树任务",s.sideQuests,"🌳"]].map(([type,label,list,icon])=>(
             <ACCard key={type} title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:type==="main"?20:5,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
-              {list.length===0&&<div style={S.empty}>暂无任务，去冒险吧！</div>}
+              {list.filter(q=>!q.done).length===0&&<div style={S.empty}>暂无任务，去冒险吧！</div>}
               {list.filter(q=>!q.done).map(q=>(
                 <div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>🔸 {q.title}</div>
+                    <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>{icon} {q.title}</div>
                     {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
                     <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
                   </div>
@@ -1377,8 +1450,8 @@ function App(){
               ))}
             </ACCard>
           ))}
-          <ACCard title={t("🌸 浇水任务","🌸 Recurring")} action={<button style={S.plusBtn} onClick={()=>{setQForm({type:"recurring",title:"",desc:"",xp:5,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
-            {s.recurringQuests.length===0&&<div style={S.empty}>添加每周/每月浇水任务吧！</div>}
+          <ACCard title={t("💦 浇水任务","💦 Recurring")} action={<button style={S.plusBtn} onClick={()=>{setQForm({type:"recurring",title:"",desc:"",xp:5,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
+            {s.recurringQuests.length===0&&<div style={S.empty}>添加每周/每月浇水任务吧 💦</div>}
             {s.recurringQuests.map(q=>{
               const ok=canDoR(q);
               const lastDoneStr=q.lastDone?new Date(q.lastDone).toLocaleDateString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
@@ -1470,7 +1543,7 @@ function App(){
           />
 
           {/* badge collection */}
-          <ACCard title="🏅 徽章收藏" action={<span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{badges.length} 枚</span>}>
+          <ACCard title="⛵️ 离岛旅行" action={<span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{badges.length} 枚</span>}>
             {badges.length===0
               ?<div style={S.empty}>升级后将获得世界景点徽章 🌍<br/><span style={{fontSize:11}}>每100🌸升一级</span></div>
               :<BadgeCollection badges={badges}/>
@@ -1496,7 +1569,7 @@ function App(){
             longStats={s.longStats}
             shortStats={s.shortStats}
             today={today}
-            onAdd={()=>{setEvForm({text:"",xp:0,changes:{},tag:""});setModal("bigEvent");}}
+            onAdd={()=>{setEvForm({text:"",xp:1,changes:{},tag:""});setModal("bigEvent");}}
             onEdit={(ev)=>{setEvForm({id:ev.id,text:ev.text,xp:ev.xp||0,changes:ev.statChanges||{},tag:ev.tag||""});setModal("bigEvent");}}
             onDeleteTag={tag=>save({...s,eventTags:(s.eventTags||[]).filter(t=>t!==tag)})}
             onAddTag={tag=>{if(tag&&!(s.eventTags||[]).includes(tag))save({...s,eventTags:[...(s.eventTags||[]),tag]});}}
@@ -1513,9 +1586,9 @@ function App(){
 
       {modal==="quest"&&qForm&&(
         <Drawer onClose={()=>{setModal(null);setQForm(null);}}>
-          <div style={S.dH}>{t("接取新任务 🌱","New Quest 🌱")}</div>
+          <div style={S.dH}>{t("岛上新任务 🏝️","New Quest 🏝️")}</div>
           <div style={S.tog}>
-            {[["main",t("🌳 种树","🌳 Main")],["side",t("🗺️ 探索","🗺️ Side")],["recurring",t("🌸 浇水","🌸 Recurring")]].map(([t,l])=>(
+            {[["main",t("🌵 开荒主线","🌵 Pioneer")],["side",t("🌳 种树任务","🌳 Plant")],["recurring",t("💦 浇水任务","💦 Water")]].map(([t,l])=>(
               <button key={t} style={{...S.tBtn,...(qForm.type===t?S.tOn:{})}} onClick={()=>setQForm(p=>({...p,type:t}))}>{l}</button>
             ))}
           </div>
@@ -1753,7 +1826,7 @@ function TodayEntry({today,dayColors,daySummaries,onPickColor,onSaveSummary}){
     }}>
       {/* header row: 今天 label + color dot */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-        <div style={{fontSize:12,fontWeight:900,letterSpacing:.5,color:bg?tc:"#7A5C44"}}>🍃 今天</div>
+        <div style={{fontSize:12,fontWeight:900,letterSpacing:.5,color:bg?tc:"#7A5C44"}}>🦋 今天</div>
         <button
           onClick={()=>setPickerOpen(o=>!o)}
           title="选择今天的颜色"
@@ -1854,7 +1927,7 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap
     <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
       {/* header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🌈 色彩日记</div>
+        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🌈 彩虹收藏</div>
         <button onClick={()=>setOpen(o=>!o)} style={{fontSize:11,fontWeight:800,color:"#5BAF5F",background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"3px 12px",cursor:"pointer"}}>
           {open?"收起 ▲":"展开 ▼"}
         </button>
@@ -1951,7 +2024,7 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
     <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
       {/* header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📌 大事记录</div>
+        <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📜 岛史档案</div>
         <button style={S.plusBtn} onClick={onAdd}>{t("＋ 记录","＋ Add")}</button>
       </div>
 
@@ -2134,8 +2207,7 @@ function Firework({onDone}){
       {/* 中央提示 */}
       <div style={{position:"absolute",top:"38%",left:"50%",transform:"translateX(-50%)",textAlign:"center",animation:"fwFade 3s ease forwards"}}>
         <div style={{fontSize:52,lineHeight:1,marginBottom:8,animation:"badgePop .4s cubic-bezier(.34,1.56,.64,1)"}}>🎉</div>
-        <div style={{fontSize:22,fontWeight:900,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,.4)",letterSpacing:.5}}>{t("今日全部完成！","All done today!")}</div>
-        <div style={{fontSize:16,color:"#FFD166",fontWeight:800,marginTop:6,textShadow:"0 1px 6px rgba(0,0,0,.4)"}}>{t("🌸 +10 花","🌸 +10 flowers")}</div>
+        <div style={{fontSize:20,fontWeight:900,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,.4)",letterSpacing:.5,padding:"0 20px"}}>{randPick(ALLDONE_TOASTS)}</div>
       </div>
       {/* 烟花 */}
       {particles.map((r,ri)=>(
@@ -2162,6 +2234,8 @@ function Firework({onDone}){
   );
 }
 
+// ─── gift box components ─────────────────────────────────
+// 黄草绿色系 #a7c957
 // ─── gift box components ─────────────────────────────────
 // 黄草绿色系 #a7c957
 const GIFT_THEMES=[
@@ -2199,7 +2273,7 @@ function GiftBoxButton({onClick}){
           </svg>
         </div>
         <div style={{textAlign:"left"}}>
-          <div style={{fontSize:15,fontWeight:900,color:"#4e6a1a",letterSpacing:.3}}>{t("抽个充能礼物吧","Open a gift")}</div>
+          <div style={{fontSize:15,fontWeight:900,color:"#4e6a1a",letterSpacing:.3}}>{randPick(GIFT_TRIGGERS)}</div>
           <div style={{fontSize:11,color:"#7fa832",marginTop:2,fontWeight:600}}>点击拆开，获取今日充能建议 🌿</div>
         </div>
       </div>
@@ -2227,7 +2301,8 @@ function GiftModal({rescueList,onClose,onEditList,drawn,setDrawn,s,save,pop}){
     }));
     setConfetti(pieces);
     setTimeout(()=>{
-      setDrawn(rescueList[Math.floor(Math.random()*rescueList.length)]);
+      const item=rescueList[Math.floor(Math.random()*rescueList.length)];
+      setDrawn(randPick(GIFT_CONTAINERS)(item));
       setPhase("revealed");
     },700);
   };
@@ -2312,10 +2387,9 @@ function GiftModal({rescueList,onClose,onEditList,drawn,setDrawn,s,save,pop}){
                 <div key={p.id} style={{position:"absolute",top:0,left:`${p.x}%`,width:p.size,height:p.size,background:p.color,borderRadius:p.size>9?"50%":"2px",animation:`confettiFall 1s ${p.delay}s ease-out forwards`,pointerEvents:"none"}}/>
               ))}
             </div>
-            <div style={{background:theme.bg,border:`3px solid ${theme.border}`,borderRadius:24,padding:"24px 20px",textAlign:"center",marginBottom:16,boxShadow:`0 8px 28px ${theme.border}88`}}>
-              <div style={{fontSize:11,fontWeight:900,color:theme.accent,letterSpacing:1.5,marginBottom:10}}>{theme.label}</div>
-              <div style={{fontSize:52,marginBottom:14,lineHeight:1,animation:"badgePop .5s cubic-bezier(.34,1.56,.64,1)"}}>🎁</div>
-              <div style={{fontSize:20,fontWeight:900,color:"#3D2B1F",lineHeight:1.4,marginBottom:8,letterSpacing:.3}}>{drawn}</div>
+            <div style={{background:theme.bg,border:`3px solid ${theme.border}`,borderRadius:24,padding:"28px 20px",textAlign:"center",marginBottom:16,boxShadow:`0 8px 28px ${theme.border}88`}}>
+              <div style={{fontSize:13,fontWeight:700,color:theme.accent,letterSpacing:.5,marginBottom:16,opacity:.8}}>{drawn.split("\n")[0]}</div>
+              <div style={{fontSize:20,fontWeight:900,color:"#3D2B1F",lineHeight:1.5,marginBottom:8,letterSpacing:.3}}>{drawn.split("\n")[1]||drawn}</div>
               <div style={{width:48,height:3,background:`linear-gradient(90deg,${theme.ribbon},${theme.accent})`,borderRadius:2,margin:"0 auto"}}/>
             </div>
             <button style={{width:"100%",background:"linear-gradient(135deg,#a7c957,#7fa832)",border:"none",color:"#fff",borderRadius:16,padding:"15px",fontSize:15,fontWeight:900,boxShadow:"0 6px 20px rgba(127,168,50,.45)",cursor:"pointer",marginBottom:10}} onClick={reopen}>
@@ -2328,7 +2402,7 @@ function GiftModal({rescueList,onClose,onEditList,drawn,setDrawn,s,save,pop}){
         )}
 
         <div style={{textAlign:"center",marginTop:8,paddingBottom:4}}>
-          <div style={{fontSize:13,fontWeight:900,color:"#4e6a1a",marginBottom:6}}>抽个充能礼物吧</div>
+          <div style={{fontSize:13,fontWeight:900,color:"#4e6a1a",marginBottom:6}}>{randPick(GIFT_TRIGGERS)}</div>
           <button style={{background:"none",border:"none",color:"#B09070",fontSize:12,cursor:"pointer",padding:"6px 12px",fontFamily:"inherit"}} onClick={onEditList}>{t("⚙️ 编辑礼物库","⚙️ Edit Library")}</button>
         </div>
       </div>
