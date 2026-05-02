@@ -234,7 +234,11 @@ const fbSave = (uid, data) => {
 };
 
 // ─── time ────────────────────────────────────────────────
-const todayKey = () => new Date().toLocaleDateString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit" });
+const todayKey = () => {
+  const now = new Date();
+  if(now.getHours() < 5){ now.setDate(now.getDate()-1); }
+  return now.toLocaleDateString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit" });
+};
 const nowHour  = () => new Date().getHours();
 const weekKey  = d => { const dt=new Date(d||Date.now()); const y=dt.getFullYear(); const s=new Date(y,0,1); return `${y}-W${Math.ceil(((dt-s)/86400000+s.getDay()+1)/7)}`; };
 const monthKey = d => { const dt=new Date(d||Date.now()); return `${dt.getFullYear()}-${dt.getMonth()+1}`; };
@@ -2126,10 +2130,22 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap
   const xLabels=trendData.filter((_,i)=>i===0||i===29||i%6===0);
 
   // Build all days: today + history, sorted newest first
+  // Also include dates that have color/summary/events but no history snapshot
+  const historyDates=new Set([...(history||[]).map(h=>h.date), today]);
+  const extraDates=new Set([
+    ...Object.keys(dayColors||{}),
+    ...Object.keys(daySummaries||{}),
+    ...(bigEvents||[]).map(ev=>ev.date),
+  ]);
+  const missingDays=[...extraDates]
+    .filter(d=>d&&!historyDates.has(d))
+    .map(d=>({date:d}));
+
   const allDays=[
     {date:today,...todaySnap,isToday:true},
     ...[...history].reverse(),
-  ];
+    ...missingDays,
+  ].sort((a,b)=>b.date>a.date?1:-1);
 
   // Group by month
   const byMonth=[];
