@@ -371,8 +371,9 @@ const DEF_LONG={
   growth:{label:"成长",icon:"📚",value:60,color:"#8B5CF6"},
 };
 const DEF_SHORT={
-  mood:  {label:"心情",icon:"☀️",value:80,color:"#FF9A5C"},
-  energy:{label:"体力",icon:"⚡",value:80,color:"#7BC67E"},
+  mood:      {label:"心情",icon:"☀️",value:80,color:"#FF9A5C"},
+  energy:    {label:"体力",icon:"⚡",value:80,color:"#7BC67E"},
+  cognition: {label:"认知力",icon:"🧠",value:80,color:"#70B8E0"},
 };
 const DEF_HABITS=[
   {id:"sleep",   label:"早睡",icon:"🌙",weeklyBonus:{stats:["health"]},weeklyTarget:6,shortBonus:{energy:20,mood:10}},
@@ -982,6 +983,8 @@ function App(){
   const [mottoD,      setMottoD]      = useState("");
   const [showWeeklyResult,setShowWeeklyResult]=useState(false);
   const [showFirework,    setShowFirework]    = useState(false);
+  const [showMorning,     setShowMorning]     = useState(false);
+  const [morningVals,     setMorningVals]     = useState({mood:80,energy:80,cognition:80});
   const popT     = useRef(null);
   const importRef= useRef(null);
 
@@ -1047,6 +1050,8 @@ function App(){
     if(d.longStats.growth)  d.longStats={...d.longStats,growth: {...d.longStats.growth, icon:"📚"}};
     if(d.longStats.wealth)  d.longStats={...d.longStats,wealth: {...d.longStats.wealth, icon:"💰"}};
     if(d.shortStats.mood)   d.shortStats={...d.shortStats,mood: {...d.shortStats.mood,  icon:"☀️"}};
+    // Migrate: add cognition if missing
+    if(!d.shortStats.cognition) d.shortStats={...d.shortStats,cognition:{label:"认知力",icon:"🧠",value:80,color:"#70B8E0"}};
     // Migrate habits: ensure weeklyBonus.stats array + weeklyTarget
     d.habits=d.habits.map(h=>{
       if(h.longBonus!==undefined&&h.weeklyBonus===undefined){
@@ -1082,6 +1087,17 @@ function App(){
     }
 
     dbSet(d);setS(d);
+    // 晨间签到检测：每天首次打开时弹出
+    const morningKey=`morningCheckin_${today}`;
+    if(!localStorage.getItem(morningKey)){
+      // 初始值取当前 shortStats（可能已被重置为80）
+      setMorningVals({
+        mood:      d.shortStats.mood?.value      ?? 80,
+        energy:    d.shortStats.energy?.value    ?? 80,
+        cognition: d.shortStats.cognition?.value ?? 80,
+      });
+      setTimeout(()=>setShowMorning(true), 600);
+    }
     // If data came from cloud, show a brief toast (deferred so pop() is available)
     if(fromCloud){ setTimeout(()=>pop("☁️ 已从云端同步最新数据"),300); }
     // If logged in but no cloud data yet (first login on this account), upload local data
@@ -1245,8 +1261,8 @@ function App(){
 
   const today=todayKey(),th=s.checkedHabits[today]||{},doneCnt=s.habits.filter(h=>th[h.id]).length;
   const xpPct=Math.min(100,(s.player.xp/s.player.xpNext)*100);
-  const lowMood=s.shortStats.mood?.value<s.rescueThreshold,lowEnergy=s.shortStats.energy?.value<s.rescueThreshold;
-  const showAlert=lowMood||lowEnergy;
+  const lowMood=s.shortStats.mood?.value<s.rescueThreshold,lowEnergy=s.shortStats.energy?.value<s.rescueThreshold,lowCognition=s.shortStats.cognition?.value<s.rescueThreshold;
+  const showAlert=lowMood||lowEnergy||lowCognition;
   const badges=s.badges||[];
 
   const t=useT();
@@ -1374,7 +1390,7 @@ function App(){
             <div style={{background:"linear-gradient(135deg,#FFF8DC,#FFF3C4)",border:"2.5px solid #FFD166",borderRadius:20,padding:"14px 16px",marginBottom:12,boxShadow:"0 4px 16px rgba(255,209,102,.3)"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:22}}>🍂</span>
-                <span style={{flex:1,fontSize:13,fontWeight:700,color:"#A06000"}}>{[lowMood&&"心情",lowEnergy&&"体力"].filter(Boolean).join("、")} 偏低，需要充充电！</span>
+                <span style={{flex:1,fontSize:13,fontWeight:700,color:"#A06000"}}>{[lowMood&&"心情",lowEnergy&&"体力",lowCognition&&"认知力"].filter(Boolean).join("、")} 偏低，需要充充电！</span>
                 <button style={{background:"#FFD166",border:"none",color:"#7A4A00",borderRadius:14,padding:"7px 16px",fontSize:12,fontWeight:900,cursor:"pointer",boxShadow:"0 2px 8px rgba(255,209,102,.5)"}} onClick={()=>setModal("rescue")}>{randPick(GIFT_TRIGGERS)}</button>
               </div>
             </div>
@@ -1383,38 +1399,61 @@ function App(){
           <ACCard title="🍊 岛屿物产">
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {Object.entries(s.longStats).map(([k,st])=>(
-                <div key={k} style={{background:"linear-gradient(145deg,#F8FFF8,#EEF8EE)",borderRadius:16,padding:"12px 10px",cursor:"pointer",border:"2px solid #C8E8C8",boxShadow:"0 2px 8px rgba(91,175,95,.1)"}} onClick={()=>{setEvForm({text:"",xp:1,changes:{}});setModal("bigEvent");}}>
-                  <div style={{fontSize:20,marginBottom:4}}>{st.icon}</div>
-                  <div style={{fontSize:10,color:"#7A5C44",fontWeight:700,marginBottom:2}}>{st.label}</div>
-                  <div style={{fontSize:26,fontWeight:900,lineHeight:1,marginBottom:6,color:st.color}}>{st.value}</div>
-                  <div style={{height:5,background:"#D4EED4",borderRadius:3,overflow:"hidden"}}>
-                    <div style={{height:"100%",borderRadius:3,background:st.color,width:`${st.value}%`,transition:"width .4s"}}/>
+                <div key={k} style={{background:"linear-gradient(145deg,#F8FFF8,#EEF8EE)",borderRadius:16,border:"2px solid #C8E8C8",boxShadow:"0 2px 8px rgba(91,175,95,.1)",overflow:"hidden",cursor:"pointer"}}>
+                  {/* 上半：点击 = + */}
+                  <div onClick={()=>{setEvForm({text:"",xp:1,changes:{[k]:1}});setModal("bigEvent");}}
+                    style={{padding:"12px 10px 10px",position:"relative",display:"flex",flexDirection:"column",alignItems:"flex-start"}}>
+                    <div style={{fontSize:20,marginBottom:4}}>{st.icon}</div>
+                    <div style={{fontSize:10,color:"#7A5C44",fontWeight:700,marginBottom:2}}>{st.label}</div>
+                    <div style={{fontSize:26,fontWeight:900,lineHeight:1,color:st.color}}>{st.value}</div>
+                  </div>
+                  {/* 分割线 */}
+                  <div style={{height:"1.5px",background:`linear-gradient(90deg,transparent,${st.color}44,transparent)`,margin:"0 8px"}}/>
+                  {/* 下半：点击 = − */}
+                  <div onClick={()=>{setEvForm({text:"",xp:1,changes:{[k]:-1}});setModal("bigEvent");}}
+                    style={{padding:"10px 10px 12px",position:"relative"}}>
+                    <div style={{height:5,background:"#D4EED4",borderRadius:3,overflow:"hidden"}}>
+                      <div style={{height:"100%",borderRadius:3,background:st.color,width:`${st.value}%`,transition:"width .4s"}}/>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>{t("点击属性记录","Tap stat to log")}</div>
+            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:8}}>{t("上半+1 · 下半−1","Top +1 · Bottom −1")}</div>
           </ACCard>
           {/* short stats */}
           <ACCard title="🌤️ 今日天气">
-            <div style={{display:"flex",gap:10}}>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
               {Object.entries(s.shortStats).map(([k,st])=>{
                 const low=st.value<s.rescueThreshold;
+                const cardBg=low?"linear-gradient(145deg,#FFFBDC,#FFF7C4)":"linear-gradient(145deg,#F8FFF8,#EEFFF0)";
+                const cardBd=low?"#FFD166":"#C8E8C8";
+                const cardSh=low?"0 2px 10px rgba(255,209,102,.25)":"0 2px 8px rgba(91,175,95,.1)";
                 return(
-                  <div key={k} style={{flex:1,background:low?"linear-gradient(145deg,#FFFBDC,#FFF7C4)":"linear-gradient(145deg,#F8FFF8,#EEFFF0)",borderRadius:16,padding:"14px 12px",border:`2px solid ${low?"#FFD166":"#C8E8C8"}`,cursor:"pointer",boxShadow:low?"0 2px 10px rgba(255,209,102,.25)":"0 2px 8px rgba(91,175,95,.1)"}} onClick={()=>{setEvForm({text:"",xp:1,changes:{}});setModal("bigEvent");}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                      <span style={{fontSize:16}}>{st.icon}</span>
-                      <span style={{fontSize:11,color:"#7A5C44",fontWeight:700}}>{st.label}</span>
+                  <div key={k} style={{flex:"1 1 calc(33% - 8px)",minWidth:80,background:cardBg,borderRadius:16,border:`2px solid ${cardBd}`,boxShadow:cardSh,overflow:"hidden",cursor:"pointer"}}>
+                    {/* 上半：点击 = +10 */}
+                    <div onClick={()=>{setEvForm({text:"",xp:1,changes:{[k]:10}});setModal("bigEvent");}}
+                      style={{padding:"12px 10px 10px",position:"relative"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
+                        <span style={{fontSize:15}}>{st.icon}</span>
+                        <span style={{fontSize:10,color:"#7A5C44",fontWeight:700}}>{st.label}</span>
+                      </div>
+                      <div style={{fontSize:28,fontWeight:900,lineHeight:1,color:st.color}}>{st.value}</div>
                     </div>
-                    <div style={{fontSize:30,fontWeight:900,lineHeight:1,marginBottom:8,color:st.color}}>{st.value}</div>
-                    <div style={{height:5,background:"#D4EED4",borderRadius:3,overflow:"hidden"}}>
-                      <div style={{height:"100%",borderRadius:3,background:st.color,width:`${st.value}%`,transition:"width .4s"}}/>
+                    {/* 分割线 */}
+                    <div style={{height:"1.5px",background:`linear-gradient(90deg,transparent,${st.color}44,transparent)`,margin:"0 8px"}}/>
+                    {/* 下半：点击 = −10 */}
+                    <div onClick={()=>{setEvForm({text:"",xp:1,changes:{[k]:-10}});setModal("bigEvent");}}
+                      style={{padding:"10px 10px 12px",position:"relative"}}>
+                      <div style={{height:5,background:"#D4EED4",borderRadius:3,overflow:"hidden"}}>
+                        <div style={{height:"100%",borderRadius:3,background:st.color,width:`${st.value}%`,transition:"width .4s"}}/>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:6}}>每天 05:00 天气重置</div>
+            <div style={{fontSize:10,color:"#B09070",textAlign:"right",marginTop:6}}>上半+10 · 下半−10 · 每天 05:00 重置</div>
           </ACCard>
           
           {/* motto */}
@@ -1590,6 +1629,83 @@ function App(){
 
         <div style={{height:60}}/>
       </div>
+
+      {/* 晨间签到弹窗 */}
+      {showMorning&&s&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}}>
+          <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px 24px",width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #D4EED4",animation:"pop .25s ease"}}>
+            {/* 标题 */}
+            <div style={{textAlign:"center",marginBottom:22}}>
+              <div style={{fontSize:28,marginBottom:6}}>🌅</div>
+              <div style={{fontSize:18,fontWeight:900,color:"#3D2B1F"}}>欢迎来到今天</div>
+              <div style={{fontSize:12,color:"#B09070",marginTop:4}}>今天的起始状态是：</div>
+            </div>
+            {/* 三个滑块 */}
+            {[
+              {k:"mood",      st:s.shortStats.mood},
+              {k:"energy",    st:s.shortStats.energy},
+              {k:"cognition", st:s.shortStats.cognition},
+            ].filter(({st})=>!!st).map(({k,st})=>(
+              <div key={k} style={{marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:7}}>
+                    <span style={{fontSize:18}}>{st.icon}</span>
+                    <span style={{fontSize:13,fontWeight:800,color:"#3D2B1F"}}>{st.label}</span>
+                  </div>
+                  <span style={{fontSize:20,fontWeight:900,color:st.color,minWidth:36,textAlign:"right"}}>{morningVals[k]}</span>
+                </div>
+                <div style={{position:"relative",height:28,display:"flex",alignItems:"center"}}>
+                  {/* track */}
+                  <div style={{position:"absolute",left:0,right:0,height:6,borderRadius:3,background:"#E8F5E8",overflow:"hidden"}}>
+                    <div style={{height:"100%",borderRadius:3,background:st.color,width:`${morningVals[k]}%`,transition:"width .1s"}}/>
+                  </div>
+                  <input type="range" min="0" max="100" value={morningVals[k]}
+                    onChange={e=>setMorningVals(p=>({...p,[k]:Number(e.target.value)}))}
+                    style={{
+                      position:"relative",width:"100%",appearance:"none",WebkitAppearance:"none",
+                      background:"transparent",cursor:"pointer",height:28,margin:0,
+                      outline:"none",border:"none",
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+            {/* 滑块样式 */}
+            <style>{`
+              input[type=range]::-webkit-slider-thumb{
+                -webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+                background:#fff;border:2.5px solid #7BC67E;box-shadow:0 2px 8px rgba(91,175,95,.3);cursor:pointer;
+              }
+              input[type=range]::-moz-range-thumb{
+                width:22px;height:22px;border-radius:50%;
+                background:#fff;border:2.5px solid #7BC67E;box-shadow:0 2px 8px rgba(91,175,95,.3);cursor:pointer;
+              }
+            `}</style>
+            {/* 确认按钮 */}
+            <button style={{...S.cfmBtn,marginTop:6}} onClick={()=>{
+              const today=todayKey();
+              const morningKey=`morningCheckin_${today}`;
+              // 1. 更新 shortStats
+              const newShort={...s.shortStats};
+              Object.keys(morningVals).forEach(k=>{
+                if(newShort[k]) newShort[k]={...newShort[k],value:morningVals[k]};
+              });
+              // 2. 生成岛上新闻
+              const ms=s.shortStats;
+              const text=`心情 ${morningVals.mood}  体力 ${morningVals.energy}  认知力 ${morningVals.cognition}`;
+              const existingTags=s.eventTags||[];
+              const newTags=existingTags.includes("晨间打卡")?existingTags:[...existingTags,"晨间打卡"];
+              const ev={id:Date.now(),date:today,text,xp:1,statChanges:{},tag:"晨间打卡"};
+              let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+              // 3. 保存
+              save({...s,shortStats:newShort,eventTags:newTags,bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+              localStorage.setItem(morningKey,"1");
+              setShowMorning(false);
+              pop("🌅 晨间签到完成！🌸+1");
+            }}>开始今天 🌿</button>
+          </div>
+        </div>
+      )}
 
       {/* modals */}
       {modal==="rescue"&&(
