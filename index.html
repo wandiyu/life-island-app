@@ -2135,10 +2135,9 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap
   const extraDates=new Set([
     ...Object.keys(dayColors||{}),
     ...Object.keys(daySummaries||{}),
-    ...(bigEvents||[]).map(ev=>ev.date),
   ]);
   const missingDays=[...extraDates]
-    .filter(d=>d&&!historyDates.has(d)&&d<=today)
+    .filter(d=>d&&!historyDates.has(d))
     .map(d=>({date:d}));
 
   const allDays=[
