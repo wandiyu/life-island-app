@@ -1050,8 +1050,9 @@ function App(){
     if(d.longStats.growth)  d.longStats={...d.longStats,growth: {...d.longStats.growth, icon:"📚"}};
     if(d.longStats.wealth)  d.longStats={...d.longStats,wealth: {...d.longStats.wealth, icon:"💰"}};
     if(d.shortStats.mood)   d.shortStats={...d.shortStats,mood: {...d.shortStats.mood,  icon:"☀️"}};
-    // Migrate: add cognition if missing
+    // Migrate: add cognition if missing, fix label if stale
     if(!d.shortStats.cognition) d.shortStats={...d.shortStats,cognition:{label:"脑力",icon:"🧠",value:80,color:"#70B8E0"}};
+    else if(d.shortStats.cognition.label!=="脑力") d.shortStats={...d.shortStats,cognition:{...d.shortStats.cognition,label:"脑力"}};
     // Migrate habits: ensure weeklyBonus.stats array + weeklyTarget
     d.habits=d.habits.map(h=>{
       if(h.longBonus!==undefined&&h.weeklyBonus===undefined){
@@ -1079,7 +1080,7 @@ function App(){
     // Check weekly settlement: trigger if it's Saturday (day 6) and not yet settled this week
     const now=new Date();
     const curWeekKey=getWeekKey(now);
-    if(now.getDay()===6&&d.lastWeeklySettleDate!==curWeekKey){
+    if(now.getDay()===0&&d.lastWeeklySettleDate!==curWeekKey){
       const{newLongStats,extraFlowers,gains}=runWeeklySettle(d.habits,d.checkedHabits,d.longStats);
       d={...d,longStats:newLongStats,player:{...d.player,xp:d.player.xp+extraFlowers},
          lastWeeklySettleDate:curWeekKey,
@@ -1667,8 +1668,8 @@ function App(){
             {/* 标题 */}
             <div style={{textAlign:"center",marginBottom:22}}>
               <div style={{fontSize:28,marginBottom:6}}>🌅</div>
-              <div style={{fontSize:18,fontWeight:900,color:"#3D2B1F"}}>今天状态怎样？</div>
-              <div style={{fontSize:12,color:"#B09070",marginTop:4}}>拖动滑块设置今天的起始状态</div>
+              <div style={{fontSize:18,fontWeight:900,color:"#3D2B1F"}}>欢迎来到今天</div>
+              <div style={{fontSize:12,color:"#B09070",marginTop:4}}>今天的起始状态是：</div>
             </div>
             {/* 三个滑块 */}
             {[
