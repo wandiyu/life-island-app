@@ -373,7 +373,7 @@ const DEF_LONG={
 const DEF_SHORT={
   mood:      {label:"心情",icon:"☀️",value:80,color:"#FF9A5C"},
   energy:    {label:"体力",icon:"⚡",value:80,color:"#7BC67E"},
-  cognition: {label:"认知力",icon:"🧠",value:80,color:"#70B8E0"},
+  cognition: {label:"脑力",icon:"🧠",value:80,color:"#70B8E0"},
 };
 const DEF_HABITS=[
   {id:"sleep",   label:"早睡",icon:"🌙",weeklyBonus:{stats:["health"]},weeklyTarget:6,shortBonus:{energy:20,mood:10}},
@@ -1051,7 +1051,7 @@ function App(){
     if(d.longStats.wealth)  d.longStats={...d.longStats,wealth: {...d.longStats.wealth, icon:"💰"}};
     if(d.shortStats.mood)   d.shortStats={...d.shortStats,mood: {...d.shortStats.mood,  icon:"☀️"}};
     // Migrate: add cognition if missing
-    if(!d.shortStats.cognition) d.shortStats={...d.shortStats,cognition:{label:"认知力",icon:"🧠",value:80,color:"#70B8E0"}};
+    if(!d.shortStats.cognition) d.shortStats={...d.shortStats,cognition:{label:"脑力",icon:"🧠",value:80,color:"#70B8E0"}};
     // Migrate habits: ensure weeklyBonus.stats array + weeklyTarget
     d.habits=d.habits.map(h=>{
       if(h.longBonus!==undefined&&h.weeklyBonus===undefined){
@@ -1390,7 +1390,7 @@ function App(){
             <div style={{background:"linear-gradient(135deg,#FFF8DC,#FFF3C4)",border:"2.5px solid #FFD166",borderRadius:20,padding:"14px 16px",marginBottom:12,boxShadow:"0 4px 16px rgba(255,209,102,.3)"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:22}}>🍂</span>
-                <span style={{flex:1,fontSize:13,fontWeight:700,color:"#A06000"}}>{[lowMood&&"心情",lowEnergy&&"体力",lowCognition&&"认知力"].filter(Boolean).join("、")} 偏低，需要充充电！</span>
+                <span style={{flex:1,fontSize:13,fontWeight:700,color:"#A06000"}}>{[lowMood&&"心情",lowEnergy&&"体力",lowCognition&&"脑力"].filter(Boolean).join("、")} 偏低，需要充充电！</span>
                 <button style={{background:"#FFD166",border:"none",color:"#7A4A00",borderRadius:14,padding:"7px 16px",fontSize:12,fontWeight:900,cursor:"pointer",boxShadow:"0 2px 8px rgba(255,209,102,.5)"}} onClick={()=>setModal("rescue")}>{randPick(GIFT_TRIGGERS)}</button>
               </div>
             </div>
@@ -1692,7 +1692,7 @@ function App(){
               });
               // 2. 生成岛上新闻
               const ms=s.shortStats;
-              const text=`心情 ${morningVals.mood}  体力 ${morningVals.energy}  认知力 ${morningVals.cognition}`;
+              const text=`心情 ${morningVals.mood}  体力 ${morningVals.energy}  脑力 ${morningVals.cognition}`;
               const existingTags=s.eventTags||[];
               const newTags=existingTags.includes("晨间打卡")?existingTags:[...existingTags,"晨间打卡"];
               const ev={id:Date.now(),date:today,text,xp:1,statChanges:{},tag:"晨间打卡"};
