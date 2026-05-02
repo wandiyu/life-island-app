@@ -2131,20 +2131,17 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap
 
   // Build all days: today + history, sorted newest first
   // Also include dates that have color/summary/events but no history snapshot
+  // Build all days deduped by date, newest first
+  const dayMap=new Map();
+  // lowest priority: history (oldest first so newer overwrites)
+  [...(history||[])].forEach(h=>{if(h.date)dayMap.set(h.date,h);});
+  // missing days (have color/summary but no snapshot)
   const historyDates=new Set([...(history||[]).map(h=>h.date), today]);
-  const extraDates=new Set([
-    ...Object.keys(dayColors||{}),
-    ...Object.keys(daySummaries||{}),
-  ]);
-  const missingDays=[...extraDates]
-    .filter(d=>d&&!historyDates.has(d))
-    .map(d=>({date:d}));
-
-  const allDays=[
-    {date:today,...todaySnap,isToday:true},
-    ...[...history].reverse(),
-    ...missingDays,
-  ].sort((a,b)=>b.date>a.date?1:-1);
+  Object.keys(dayColors||{}).forEach(d=>{if(d&&!historyDates.has(d))dayMap.set(d,{date:d});});
+  Object.keys(daySummaries||{}).forEach(d=>{if(d&&!historyDates.has(d))dayMap.set(d,{date:d});});
+  // highest priority: today
+  dayMap.set(today,{date:today,...todaySnap,isToday:true});
+  const allDays=[...dayMap.values()].sort((a,b)=>a.date<b.date?1:-1);
 
   // Group by month
   const byMonth=[];
