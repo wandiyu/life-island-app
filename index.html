@@ -396,43 +396,66 @@ const FISH_LIST=[
   {emoji:"🐙",name:"章鱼"},{emoji:"🦑",name:"乌贼"},{emoji:"🐬",name:"海豚"},
   {emoji:"🐢",name:"海龟"},{emoji:"🦞",name:"龙虾"},{emoji:"🐋",name:"座头鲸"},{emoji:"🐳",name:"蓝鲸"},
 ];
-const FISH_DAYS_TO_UNLOCK=30;
-const FISH_MISS_UNHEALTHY=3;
-const FISH_FED_RECOVER=3;
+const FISH_MAX_FRIENDSHIP=15;
+const FISH_MISS_PENALTY=3;   // days missed → friendship -3
+const FISH_STAGES=[
+  {min:0,  max:2,  label:"初见"},
+  {min:3,  max:5,  label:"相识"},
+  {min:6,  max:8,  label:"熟悉"},
+  {min:9,  max:11, label:"亲近"},
+  {min:12, max:14, label:"默契"},
+];
+const fishStage=(f)=>FISH_STAGES.find(s=>f>=s.min&&f<=s.max)||FISH_STAGES[0];
 
-// Returns updated fishPond after feeding
-function doFeedFish(fp,today){
-  if(fp.lastFedDate===today) return fp; // already fed today
-  let{currentFish,totalDays,unlockedFish,consecutiveMissed,isHealthy,consecutiveFed}=fp;
-  totalDays+=1;
-  consecutiveFed+=1;
-  consecutiveMissed=0;
-  if(!isHealthy&&consecutiveFed>=FISH_FED_RECOVER) isHealthy=true;
-  // unlock next fish
-  if(totalDays>=FISH_DAYS_TO_UNLOCK&&currentFish<FISH_LIST.length-1){
-    currentFish+=1;
-    totalDays=0;
-    consecutiveFed=0;
-    if(!unlockedFish.includes(currentFish)) unlockedFish=[...unlockedFish,currentFish];
-    isHealthy=true;
+// Returns {newFp, becameFriend} after feeding
+function doFeedFish(fp, today){
+  if(fp.lastFedDate===today) return {newFp:fp, becameFriend:false};
+  let{currentFish,friendships,currentFriendship}={
+    currentFish:0,friendships:[],currentFriendship:0,...fp
+  };
+  currentFriendship=Math.min(FISH_MAX_FRIENDSHIP,(currentFriendship||0)+1);
+  let becameFriend=false;
+  if(currentFriendship>=FISH_MAX_FRIENDSHIP){
+    becameFriend=true;
+    if(!friendships.find(f=>f.index===currentFish)){
+      friendships=[...friendships,{index:currentFish,nickname:"",friendDay:today}];
+    }
+    const friendedIndices=new Set(friendships.map(f=>f.index));
+    const remaining=FISH_LIST.map((_,i)=>i).filter(i=>!friendedIndices.has(i));
+    if(remaining.length>0) currentFish=remaining[Math.floor(Math.random()*remaining.length)];
+    currentFriendship=0;
   }
-  return{...fp,currentFish,totalDays,unlockedFish,lastFedDate:today,consecutiveMissed,isHealthy,consecutiveFed};
+  return{newFp:{...fp,currentFish,friendships,currentFriendship,lastFedDate:today},becameFriend};
 }
 
-// Call on app load to count missed days
-function updateFishMissed(fp,today){
-  if(!fp.lastFedDate||fp.lastFedDate===today) return fp;
-  // count calendar days between lastFedDate and today (using game 05:00 boundary)
+function updateFishMissed(fp, today){
+  if(!fp||!fp.lastFedDate||fp.lastFedDate===today) return fp||{};
   const a=new Date(fp.lastFedDate.replace(/\//g,"-"));
   const b=new Date(today.replace(/\//g,"-"));
-  const missed=Math.round((b-a)/(86400000));
-  if(missed<=0) return fp;
-  let{consecutiveMissed,isHealthy,consecutiveFed}=fp;
-  consecutiveMissed+=missed;
-  consecutiveFed=0;
-  if(consecutiveMissed>=FISH_MISS_UNHEALTHY) isHealthy=false;
-  return{...fp,consecutiveMissed,isHealthy,consecutiveFed};
+  const missedDays=Math.round((b-a)/86400000);
+  if(missedDays<=0) return fp;
+  const periods=Math.floor(missedDays/FISH_MISS_PENALTY); // every 3 days = -3
+  if(periods<=0) return fp;
+  const penalty=periods*3;
+  const currentFriendship=Math.max(0,(fp.currentFriendship||0)-penalty);
+  return{...fp,currentFriendship};
 }
+const FEED_LINES=[
+  "它们在你手边停留了一会儿",
+  "鱼群绕着你转了一圈",
+  "有一只把食物叼走了，回头看了你一眼",
+  "其中一只的眼睛亮了一下",
+];
+const EARLY_FISH_MSGS=(t)=>[
+  `鱼群游到了岸边，现在是${t}`,
+  `鱼池里有动静，现在是${t}`,
+  `鱼群正在等你，现在是${t}`,
+];
+const LATE_FISH_MSGS=[
+  "鱼群已经游走了，明天早点来吧",
+  "鱼群游走了，明天见",
+  "今天的鱼群游走了，请明天再来",
+];
 
 const INIT={
   player:        {name:"旅行者",level:1,xp:0,xpNext:100},
@@ -467,15 +490,11 @@ const INIT={
   lastWeeklySettleDate: "",
   pendingWeeklyResult: null,
   fishPond: {
-    currentFish:       0,
-    totalDays:         0,
-    unlockedFish:      [0],
-    lastFedDate:       "",
-    consecutiveMissed: 0,
-    isHealthy:         true,
-    consecutiveFed:    0,
-  },
-};
+    currentFish:        0,
+    friendships:        [],
+    currentFriendship:  0,
+    lastFedDate:        "",
+  },};
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
 const applyB = (stats,bonus={})=>{
@@ -1100,8 +1119,20 @@ function App(){
     if(!d.lastWeeklySettleDate)       d.lastWeeklySettleDate="";
     if(d.pendingWeeklyResult===undefined) d.pendingWeeklyResult=null;
     // Migrate: fishPond
-    if(!d.fishPond) d.fishPond={currentFish:0,totalDays:0,unlockedFish:[0],lastFedDate:"",consecutiveMissed:0,isHealthy:true,consecutiveFed:0};
-    if(d.fishPond.consecutiveFed===undefined) d.fishPond={...d.fishPond,consecutiveFed:0};
+    if(!d.fishPond||d.fishPond.totalDays!==undefined||d.fishPond.unlockedFish!==undefined){
+      const old=d.fishPond||{};
+      const isNew=!old.lastFedDate&&!(old.friendships||[]).length;
+      d.fishPond={
+        currentFish:       isNew?Math.floor(Math.random()*FISH_LIST.length):(old.currentFish||0),
+        friendships:       old.friendships||[],
+        currentFriendship: old.currentFriendship||0,
+        lastFedDate:       old.lastFedDate||"",
+      };
+    } else {
+      // Strip obsolete fields
+      const{isHealthy,consecutiveFed,consecutiveMissed,...rest}=d.fishPond;
+      d.fishPond=rest;
+    }
     // Migrate longStats: add growth if missing
     if(!d.longStats.growth)           d.longStats={...d.longStats,growth:{label:"成长",icon:"📚",value:60,color:"#8B5CF6"}};
     // Force-update stat icons to latest emojis (overwrite whatever is in saved data)
@@ -1681,59 +1712,76 @@ function App(){
         {tab==="log"&&<>
           {/* 🐠 鱼池 */}
           {(()=>{
-            const fp=s.fishPond||{};
-            const curFish=FISH_LIST[fp.currentFish||0];
-            const unlocked=fp.unlockedFish||[0];
-            const healthy=fp.isHealthy!==false;
-            const missed=fp.consecutiveMissed||0;
-            const totalDays=fp.totalDays||0;
+            const fp={currentFish:0,friendships:[],currentFriendship:0,...(s.fishPond||{})};
+            const curFish=FISH_LIST[fp.currentFish]||FISH_LIST[0];
+            const friendship=fp.currentFriendship||0;
+            const friends=fp.friendships||[];
+            const stage=fishStage(friendship);
             return(
-              <ACCard title="🐠 鱼池">
-                {/* 已解锁的鱼 */}
-                {unlocked.length>0&&(
-                  <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
-                    {unlocked.map(idx=>{
-                      const f=FISH_LIST[idx];
-                      const isCurrent=idx===fp.currentFish;
+              <ACCard title="🐋 今日访客" action={friends.length>0&&<button onClick={()=>setModal("fishFriends")} style={{fontSize:11,fontWeight:800,color:"#3A9EC0",background:"#EEF9FF",border:"2px solid #B8DFF5",borderRadius:12,padding:"3px 10px",cursor:"pointer"}}>朋友 {friends.length}</button>}>
+                {/* 当前鱼群状态 */}
+                <div style={{background:"linear-gradient(135deg,#F0FAFF,#E4F5FF)",borderRadius:16,padding:"12px 14px",border:"2px solid #BCD8ED",marginBottom:friends.length>0?12:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                    <span style={{fontSize:36}}>{curFish.emoji}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:900,color:"#1A5A7A"}}>{curFish.name}鱼群</div>
+                      <div style={{fontSize:11,color:"#8AAAB8",marginTop:3}}>
+                        {(()=>{
+                          if(!fp.lastFedDate) return "还没有见过面";
+                          if(fp.lastFedDate===today) return "今天遇到了它们";
+                          const a=new Date(fp.lastFedDate.replace(/\//g,"-"));
+                          const b=new Date(today.replace(/\//g,"-"));
+                          const days=Math.round((b-a)/86400000);
+                          return `上次见面，${days}天前`;
+                        })()}
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right",minWidth:44}}>
+                      <div style={{fontSize:18,fontWeight:900,color:"#3A9EC0"}}>{friendship}</div>
+                      <div style={{fontSize:10,color:"#8AAAB8"}}>/ {FISH_MAX_FRIENDSHIP}</div>
+                    </div>
+                  </div>
+                  {/* 分3格进度条 */}
+                  <div style={{display:"flex",gap:4}}>
+                    {FISH_STAGES.map((sg,i)=>{
+                      const segMin=sg.min, segMax=sg.max, segTotal=segMax-segMin+1;
+                      const filled=friendship>segMax; // 已超过
+                      const active=friendship>=segMin&&friendship<=segMax; // 当前段
+                      const empty=friendship<segMin; // 未到
+                      const pct=active?((friendship-segMin)/segTotal)*100:filled?100:0;
                       return(
-                        <div key={idx} style={{
-                          display:"flex",alignItems:"center",gap:5,
-                          padding:"5px 10px",borderRadius:12,
-                          background:isCurrent?"linear-gradient(135deg,#EEF9FF,#D8F0FF)":"#F5F5F0",
-                          border:`2px solid ${isCurrent?"#7BBFDF":"#D8D8D0"}`,
-                        }}>
-                          <span style={{fontSize:18,filter:isCurrent&&!healthy?"grayscale(1) opacity(.5)":"none"}}>{f.emoji}</span>
-                          <span style={{fontSize:11,fontWeight:700,color:isCurrent?"#2A6080":"#888"}}>{f.name}</span>
-                          {isCurrent&&<span style={{fontSize:10,color:healthy?"#5BAF5F":"#E07050",fontWeight:800,marginLeft:2}}>{healthy?"💚":"🩶"}</span>}
+                        <div key={i} style={{flex:1}}>
+                          <div style={{height:8,background:"#C8E4F0",borderRadius:4,overflow:"hidden",border:active?"2px solid #3A9EC0":"2px solid transparent",boxSizing:"border-box"}}>
+                            <div style={{height:"100%",borderRadius:2,background:filled?"#3A9EC0":active?"linear-gradient(90deg,#5BBFE0,#3A9EC0)":"transparent",width:`${pct}%`,transition:"width .4s"}}/>
+                          </div>
+                          <div style={{fontSize:9,color:active?"#3A9EC0":filled?"#7AAABF":"#B0C8D8",textAlign:"center",marginTop:3,fontWeight:active?800:500}}>{sg.label}</div>
                         </div>
                       );
                     })}
                   </div>
-                )}
-                {/* 当前鱼详情 */}
-                <div style={{background:"linear-gradient(135deg,#F5FBFF,#EBF6FF)",borderRadius:16,padding:"12px 14px",border:"2px solid #C0DCED"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                    <span style={{fontSize:32,filter:healthy?"none":"grayscale(1) opacity(.45)"}}>{curFish.emoji}</span>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:900,color:"#2A6080"}}>{curFish.name}</div>
-                      <div style={{fontSize:11,color:"#5A8FA8",marginTop:2}}>
-                        {healthy?"状态良好 💚":"状态不佳 🩶"}
-                        {!healthy&&missed>0&&<span style={{color:"#C06040",marginLeft:8}}>已 {missed} 天未喂鱼</span>}
-                      </div>
-                    </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:18,fontWeight:900,color:"#3A9EC0"}}>{totalDays}</div>
-                      <div style={{fontSize:10,color:"#8AAAB8"}}>/ {FISH_DAYS_TO_UNLOCK} 天</div>
-                    </div>
-                  </div>
-                  {/* 进度条 */}
-                  <div style={{height:6,background:"#C8E4F0",borderRadius:3,overflow:"hidden"}}>
-                    <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,#5BBFE0,#3A9EC0)",width:`${(totalDays/FISH_DAYS_TO_UNLOCK)*100}%`,transition:"width .4s"}}/>
-                  </div>
-                  {fp.currentFish>=FISH_LIST.length-1&&totalDays>=FISH_DAYS_TO_UNLOCK&&(
-                    <div style={{fontSize:11,color:"#5BAF5F",textAlign:"center",marginTop:8,fontWeight:700}}>🐳 已解锁全部鱼类！</div>
-                  )}
                 </div>
+                {/* 已成为朋友的鱼 */}
+                {friends.length>0&&(
+                  <div>
+                    <div style={{fontSize:11,color:"#7A5C44",fontWeight:800,marginBottom:8}}>🫧 已成为朋友的鱼</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {friends.map((f,i)=>{
+                        const fish=FISH_LIST[f.index]||{emoji:"🐟",name:"鱼"};
+                        const name=f.nickname||fish.name;
+                        return(
+                          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,background:"#FAFFF8",border:"1.5px solid #C8E8C8"}}>
+                            <span style={{fontSize:22}}>{fish.emoji}</span>
+                            <div style={{flex:1}}>
+                              <span style={{fontSize:13,fontWeight:800,color:"#2A5A30"}}>{name}</span>
+                              {f.nickname&&<span style={{fontSize:10,color:"#8AAA80",marginLeft:6}}>{fish.name}</span>}
+                            </div>
+                            {f.friendDay&&<span style={{fontSize:10,color:"#B09070"}}>{f.friendDay.slice(5).replace("/",".")}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </ACCard>
             );
           })()}
@@ -1825,44 +1873,36 @@ function App(){
               const timeStr=`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
               const isMorning=hh<8;
               const fp=s.fishPond||{};
-              const todayForFish=todayKey();
-              const alreadyFed=fp.lastFedDate===todayForFish;
+              const todayF=todayKey();
+              const alreadyFed=fp.lastFedDate===todayF;
               const fish=FISH_LIST[fp.currentFish||0];
-              const earlyMsgs=[
-                `鱼儿们游到了你的鱼池，现在是${timeStr}`,
-                `鱼池里有动静，现在是${timeStr}`,
-                `鱼群正在等你，现在是${timeStr}`,
-              ];
-              const lateMsgs=[
-                "鱼群已经游走了，明天早点来吧",
-                "鱼群游走了，明天见",
-                "今天的鱼群游走了，请明天再来",
-              ];
-              const msgIdx=Math.floor((now.getSeconds()+now.getMinutes())%3);
-              const msg=isMorning?earlyMsgs[msgIdx]:lateMsgs[msgIdx];
+              const msgIdx=(now.getMinutes()+now.getSeconds())%3;
+              const msg=isMorning?EARLY_FISH_MSGS(timeStr)[msgIdx]:LATE_FISH_MSGS[msgIdx];
               return(
-                <div style={{marginTop:4,marginBottom:16,padding:"14px 16px",background:"linear-gradient(135deg,#EEF9FF,#E0F4FF)",borderRadius:18,border:"2px solid #B8DFF5"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                    <span style={{fontSize:26,filter:alreadyFed?"grayscale(0)":"none"}}>{fish.emoji}</span>
+                <div style={{marginBottom:16,padding:"14px 16px",background:"linear-gradient(135deg,#EEF9FF,#E0F4FF)",borderRadius:18,border:"2px solid #B8DFF5"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:alreadyFed||!isMorning?0:10}}>
+                    <span style={{fontSize:24}}>{fish.emoji}</span>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:12,fontWeight:800,color:"#2A6080"}}>{fish.name}</div>
-                      <div style={{fontSize:11,color:"#5A8FA8",marginTop:1}}>{msg}</div>
+                      <div style={{fontSize:11,fontWeight:800,color:"#2A6080"}}>{fish.name}鱼群</div>
+                      <div style={{fontSize:11,color:"#5A8FA8",marginTop:1,lineHeight:1.4}}>{msg}</div>
                     </div>
                   </div>
                   {alreadyFed
-                    ?<div style={{fontSize:11,color:"#5BAF5F",fontWeight:700,textAlign:"center"}}>🐟 今天已经喂过了 ✓</div>
+                    ?<div style={{fontSize:11,color:"#5BAF5F",fontWeight:700,textAlign:"center",marginTop:8}}>🐟 今天已经喂过了 ✓</div>
                     :isMorning
-                      ?<button style={{width:"100%",padding:"8px 0",borderRadius:12,background:"linear-gradient(135deg,#5BBFE0,#3A9EC0)",color:"#fff",fontWeight:800,fontSize:13,border:"none",cursor:"pointer"}}
+                      ?<button style={{width:"100%",padding:"8px 0",borderRadius:12,background:"linear-gradient(135deg,#5BBFE0,#3A9EC0)",color:"#fff",fontWeight:800,fontSize:13,border:"none",cursor:"pointer",marginTop:10}}
                           onClick={()=>{
-                            const todayF=todayKey();
-                            const newFp=doFeedFish(s.fishPond||{},todayF);
+                            const tf=todayKey();
+                            const {newFp,becameFriend}=doFeedFish(s.fishPond||{},tf);
                             let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
                             save({...s,fishPond:newFp,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
-                            pop(`${FISH_LIST[newFp.currentFish].emoji} 喂鱼完成！🌸+1`);
+                            const line=FEED_LINES[Math.floor(Math.random()*FEED_LINES.length)];
+                            pop(`${FISH_LIST[fp.currentFish||0].emoji} ${line} 🌸+1`);
+                            if(becameFriend) setTimeout(()=>setModal("fishNickname"),600);
                           }}>
                           🐟 喂鱼 · 🌸+1
                         </button>
-                      :<div style={{fontSize:11,color:"#8AAAB8",textAlign:"center"}}>🌊 鱼群已游走，明天见</div>
+                      :null
                   }
                 </div>
               );
@@ -1908,6 +1948,69 @@ function App(){
           </div>
         </div>
       )}
+
+      {modal==="fishFriends"&&s&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setModal(null)}>
+          <div style={{background:"#FFFDF5",borderRadius:28,padding:"24px 20px",width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #B8DFF5",animation:"pop .25s ease",maxHeight:"75vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div style={{textAlign:"center",marginBottom:18}}>
+              <div style={{fontSize:22,fontWeight:900,color:"#1A5A7A"}}>🫧 鱼池朋友</div>
+              <div style={{fontSize:12,color:"#8AAAB8",marginTop:4}}>在这里的都是老朋友了</div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {(s.fishPond?.friendships||[]).map((f,i)=>{
+                const fish=FISH_LIST[f.index]||{emoji:"🐟",name:"鱼"};
+                const name=f.nickname||fish.name;
+                const healthy=s.fishPond?.isHealthy!==false;
+                return(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:16,background:"linear-gradient(135deg,#F0FAFF,#E8F5FF)",border:"1.5px solid #C0DCED"}}>
+                    <span style={{fontSize:28,filter:healthy?"none":"grayscale(.6) opacity(.7)"}}>{fish.emoji}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:900,color:"#1A5A7A"}}>{name}</div>
+                      {f.nickname&&<div style={{fontSize:11,color:"#8AAAB8"}}>{fish.name}</div>}
+                    </div>
+                    {f.friendDay&&<div style={{fontSize:11,color:"#B09070",textAlign:"right"}}>{f.friendDay.slice(5).replace("/",".")}<br/>结为朋友</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal==="fishNickname"&&s&&(()=>{
+        const fp=s.fishPond||{};
+        const prevIdx=(fp.currentFish||1)-1;
+        const prevFish=FISH_LIST[prevIdx]||FISH_LIST[0];
+        const friends=fp.friendships||[];
+        const thisFriend=friends.find(f=>f.index===prevIdx);
+        const [nick,setNick]=useState(thisFriend?.nickname||"");
+        return(
+          <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setModal(null)}>
+            <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px 24px",width:"100%",maxWidth:380,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #B8DFF5",animation:"pop .25s ease"}} onClick={e=>e.stopPropagation()}>
+              <div style={{textAlign:"center",marginBottom:20}}>
+                <div style={{fontSize:40,marginBottom:8}}>{prevFish.emoji}</div>
+                <div style={{fontSize:17,fontWeight:900,color:"#1A5A7A"}}>你们成为朋友了！</div>
+                <div style={{fontSize:12,color:"#5A8FA8",marginTop:6}}>给这只{prevFish.name}起个昵称吧</div>
+              </div>
+              <input
+                value={nick} onChange={e=>setNick(e.target.value)}
+                placeholder={`留空则使用默认名「${prevFish.name}」`}
+                style={{width:"100%",padding:"10px 14px",borderRadius:14,border:"2px solid #B8DFF5",fontSize:14,background:"#F5FBFF",boxSizing:"border-box",outline:"none",marginBottom:14}}
+              />
+              <div style={{display:"flex",gap:8}}>
+                <button style={{flex:1,padding:"10px 0",borderRadius:14,background:"#EEF5EE",color:"#7A5C44",fontWeight:700,fontSize:13,border:"2px solid #C8E0C8",cursor:"pointer"}}
+                  onClick={()=>setModal(null)}>跳过</button>
+                <button style={{flex:2,...S.cfmBtn,margin:0}} onClick={()=>{
+                  const newFriends=(fp.friendships||[]).map(f=>f.index===prevIdx?{...f,nickname:nick.trim()}:f);
+                  save({...s,fishPond:{...fp,friendships:newFriends}});
+                  setModal(null);
+                  pop(`🐟 ${nick.trim()||prevFish.name} 已加入你的鱼池！`);
+                }}>确认昵称 🐟</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* modals */}
       {modal==="rescue"&&(
