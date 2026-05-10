@@ -396,6 +396,100 @@ const FISH_LIST=[
   {emoji:"🐙",name:"章鱼"},{emoji:"🦑",name:"乌贼"},{emoji:"🐬",name:"海豚"},
   {emoji:"🐢",name:"海龟"},{emoji:"🦞",name:"龙虾"},{emoji:"🐋",name:"座头鲸"},{emoji:"🐳",name:"蓝鲸"},
 ];
+
+// ── Pixel fish SVG ────────────────────────────────────────
+const _P=4,_W=16,_H=16;
+const _px=(x,y,c)=>`<rect x="${x*_P}" y="${y*_P}" width="${_P}" height="${_P}" fill="${c}"/>`;
+const _row=(y,xs,xe,c)=>{let s='';for(let x=xs;x<=xe;x++)s+=_px(x,y,c);return s;};
+const _svg=(body,size=64)=>`<svg viewBox="0 0 ${_W*_P} ${_H*_P}" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated">${body}</svg>`;
+
+const FISH_SVG=[
+  // 0 🐠 小丑鱼
+  ()=>{const[O,W,B,F]=['#e8621a','#f5f5f0','#1a1a1a','#cc4400'];
+    return _row(5,3,12,O)+_row(6,2,13,O)+_row(7,2,14,O)+_row(8,2,14,O)+_row(9,2,13,O)+_row(10,3,12,O)
+      +_row(6,4,5,W)+_row(7,4,5,W)+_row(8,4,5,W)+_row(9,4,5,W)
+      +_row(6,8,9,W)+_row(7,8,9,W)+_row(8,8,9,W)+_row(9,8,9,W)
+      +_row(6,12,13,W)+_row(7,12,13,W)+_row(8,12,13,W)+_row(9,12,13,W)
+      +_row(4,1,2,F)+_row(5,1,2,F)+_row(10,1,2,F)+_row(11,1,2,F)
+      +_row(3,6,7,O)+_row(2,7,8,F)
+      +_px(8,4,B)+_px(8,3,W)+_px(6,3,B)+_px(9,3,B);},
+  // 1 🐡 河豚
+  ()=>{const[Y,S,B,W,T]=['#f0c030','#d4a010','#1a1a1a','#fff8e0','#c8d820'];
+    return _row(4,4,11,Y)+_row(5,3,12,Y)+_row(6,2,13,Y)+_row(7,2,13,Y)+_row(8,2,13,Y)+_row(9,2,13,Y)+_row(10,3,12,Y)+_row(11,4,11,Y)
+      +_row(7,5,10,W)+_row(8,5,10,W)+_row(9,5,10,W)
+      +_px(3,5,T)+_px(2,4,T)+_px(3,9,T)+_px(2,10,T)+_px(5,2,T)+_px(8,1,T)+_px(11,2,T)+_px(5,12,T)+_px(8,13,T)+_px(11,12,T)
+      +_px(7,5,B)+_px(6,5,W)+_px(6,8,B)+_px(6,9,B)
+      +_row(6,13,14,S)+_row(7,13,14,S)+_row(8,13,14,S)+_row(9,13,14,S);},
+  // 2 🦈 鲨鱼宝宝
+  ()=>{const[G,D,W,B]=['#6ab0c8','#4888a0','#f0f8ff','#1a1a1a'];
+    return _row(6,2,12,G)+_row(7,2,13,G)+_row(8,2,13,G)+_row(9,2,13,G)+_row(10,2,12,G)+_row(11,3,10,G)
+      +_row(8,5,10,W)+_row(9,5,10,W)
+      +_px(3,6,G)+_px(2,7,G)+_px(2,8,G)+_px(3,8,G)+_px(4,8,G)
+      +_px(13,5,D)+_px(14,4,D)+_px(14,5,D)+_px(13,10,D)+_px(14,10,D)+_px(14,11,D)
+      +_px(8,4,B)+_px(7,4,W)+_row(10,5,7,W)+_px(10,4,B)+_px(10,8,B)
+      +_row(8,13,14,D)+_row(9,13,14,D);},
+  // 3 🐙 章鱼
+  ()=>{const[P,L,B,W,S]=['#c060c0','#e090e0','#1a1a1a','#fff0ff','#d870d8'];
+    let t=_row(3,4,11,P)+_row(4,3,12,P)+_row(5,2,12,P)+_row(6,2,12,P)+_row(7,2,12,P)+_row(8,3,12,P)
+      +_px(5,5,W)+_px(5,4,B)+_px(9,5,W)+_px(9,4,B)+_px(7,7,B)+_px(6,7,B)+_px(8,7,B);
+    [[3,9],[4,10],[5,11],[6,10],[7,11],[8,10],[9,11],[10,10],[11,9],[12,10]].forEach(([x,y])=>{t+=_px(x,y,S)+_px(x,y+1,L)+_px(x,y+2,S);});
+    return t+_px(4,13,L)+_px(8,13,L)+_px(12,13,L);},
+  // 4 🦑 乌贼
+  ()=>{const[T,L,W,B,R]=['#5080b0','#80b0d8','#e8f4ff','#1a1a1a','#c03030'];
+    return _row(2,5,10,T)+_row(3,4,11,T)+_row(4,4,11,T)+_row(5,4,11,T)+_row(6,4,11,T)+_row(7,5,10,T)+_row(8,6,9,T)
+      +_px(2,7,L)+_px(1,8,L)+_px(1,9,L)+_px(2,9,L)+_px(13,7,L)+_px(14,8,L)+_px(14,9,L)+_px(13,9,L)
+      +_px(5,6,W)+_px(5,5,B)+_px(9,6,W)+_px(9,5,B)
+      +[4,5,6,7,8,9,10,11].map((x,i)=>_row(x,10,11,i%2===0?T:L)).join('')
+      +_row(4,12,13,T)+_row(6,12,13,T)+_row(8,12,13,T)+_row(10,12,13,T)
+      +_px(6,5,R)+_px(8,7,R)+_px(11,5,R);},
+  // 5 🐬 海豚
+  ()=>{const[G,L,W,B,P2]=['#5090b8','#78b8d8','#f0f8ff','#1a1a1a','#d8eef8'];
+    return _row(5,3,11,G)+_row(6,2,12,G)+_row(7,2,13,G)+_row(8,2,13,G)+_row(9,3,12,G)+_row(10,4,10,G)
+      +_row(7,5,9,P2)+_row(8,5,9,P2)
+      +_px(4,5,G)+_px(3,6,G)+_px(3,7,G)+_px(4,7,G)
+      +_row(8,13,14,L)+_row(9,13,14,L)
+      +_px(13,6,L)+_px(14,5,L)+_px(14,7,L)+_px(13,8,L)
+      +_row(7,1,2,G)+_row(8,1,2,G)
+      +_px(7,4,B)+_px(6,4,W)+_px(8,2,B)+_px(9,3,B);},
+  // 6 🐢 海龟
+  ()=>{const[G,L,S,Y,B]=['#388a50','#60b870','#2a6a38','#c8a830','#1a1a1a'];
+    return _row(4,4,11,G)+_row(5,3,12,G)+_row(6,3,12,G)+_row(7,3,12,G)+_row(8,3,12,G)+_row(9,4,11,G)
+      +_px(6,5,L)+_px(7,4,L)+_px(9,4,L)+_px(10,5,L)+_px(7,7,L)+_px(9,7,L)+_px(8,6,S)
+      +_row(6,1,3,Y)+_row(7,1,3,Y)+_px(6,2,B)
+      +_px(3,5,G)+_px(2,6,G)+_px(2,7,G)+_px(3,7,G)+_px(12,5,G)+_px(13,6,G)+_px(13,7,G)+_px(12,7,G)
+      +_px(4,10,G)+_px(3,11,G)+_px(11,10,G)+_px(12,11,G);},
+  // 7 🦞 龙虾
+  ()=>{const[R,D,O,W,B]=['#d03020','#a02010','#f06040','#fff0ee','#1a1a1a'];
+    return _row(5,4,10,R)+_row(6,3,10,R)+_row(7,3,10,R)+_row(8,4,10,R)+_row(9,5,9,D)+_row(10,6,8,D)
+      +_row(5,1,3,R)+_row(6,1,3,R)+_px(4,2,R)+_px(3,3,R)
+      +_row(5,12,14,R)+_row(6,12,14,R)+_px(4,13,R)+_px(3,12,R)
+      +_px(4,4,D)+_px(3,4,D)+_px(2,3,D)+_px(1,2,D)+_px(4,7,D)+_px(3,7,D)+_px(2,8,D)+_px(1,9,D)
+      +[0,1,2,3].map(i=>_px(11+i,6+i,O)+_px(11+i,9-i,O)).join('')
+      +_px(6,4,B)+_px(5,4,W)
+      +_row(10,4,5,D)+_row(11,3,6,D)+_row(10,2,7,D);},
+  // 8 🐋 座头鲸
+  ()=>{const[G,L,W,B,D]=['#3a5070','#587898','#e8f0f8','#1a1a1a','#283848'];
+    return _row(3,4,11,G)+_row(4,3,12,G)+_row(5,2,13,G)+_row(6,2,13,G)+_row(7,2,13,G)+_row(8,2,12,G)+_row(9,3,11,G)+_row(10,5,9,G)
+      +_row(6,6,10,W)+_row(7,5,11,W)+_row(8,5,11,W)+_row(9,5,10,W)
+      +_px(5,4,D)+_px(7,3,D)+_px(10,3,D)
+      +_row(7,13,15,L)+_row(8,13,15,L)+_row(9,14,15,L)
+      +_px(13,4,G)+_px(14,3,G)+_px(14,5,G)+_px(13,6,G)+_px(15,3,L)+_px(15,5,L)
+      +_px(7,4,B)+_px(6,4,W)+_px(5,3,D);},
+  // 9 🐳 蓝鲸
+  ()=>{const[B2,L,W,B,D]=['#2060a0','#4090d0','#d8eeff','#0a1a2a','#184878'];
+    return _row(2,5,12,B2)+_row(3,4,13,B2)+_row(4,3,13,B2)+_row(5,3,14,B2)+_row(6,3,14,B2)+_row(7,3,13,B2)+_row(8,4,12,B2)+_row(9,5,10,B2)
+      +_row(5,7,11,W)+_row(6,6,12,W)+_row(7,6,12,W)+_row(8,6,11,W)
+      +_px(4,5,L)+_px(4,6,L)
+      +_row(6,14,15,L)+_row(7,14,15,L)+_row(8,14,15,L)
+      +_px(14,4,L)+_px(15,3,L)+_px(15,4,L)+_px(14,8,L)+_px(15,8,L)+_px(15,9,L)
+      +_px(6,5,B)+_px(5,5,W)
+      +[6,7,8,9,10].map(i=>_px(i,8,L)).join('');},
+];
+function fishSVG(idx,size=48){
+  const fn=FISH_SVG[idx];
+  if(!fn) return null;
+  return _svg(fn(),size);
+}
 const FISH_MAX_FRIENDSHIP=15;
 const FISH_MISS_PENALTY=3;   // days missed → friendship -3
 const FISH_STAGES=[
@@ -1061,6 +1155,10 @@ function App(){
   const [showFirework,    setShowFirework]    = useState(false);
   const [showMorning,     setShowMorning]     = useState(false);
   const [morningVals,     setMorningVals]     = useState({mood:80,energy:80,cognition:80});
+  const [petFish,         setPetFish]         = useState(null);
+  const [newFriendCeremony, setNewFriendCeremony] = useState(null);
+  const [nicknameFishIdx, setNicknameFishIdx]  = useState(null);
+  const [ceremonyNick,    setCeremonyNick]     = useState(""); // {index, nickname}
   const popT     = useRef(null);
   const importRef= useRef(null);
 
@@ -1122,15 +1220,22 @@ function App(){
     if(!d.fishPond||d.fishPond.totalDays!==undefined||d.fishPond.unlockedFish!==undefined){
       const old=d.fishPond||{};
       const isNew=!old.lastFedDate&&!(old.friendships||[]).length;
+      const defaultFriendIdx=Math.floor(Math.random()*FISH_LIST.length);
+      const defaultFriend={index:defaultFriendIdx,nickname:"",friendDay:""};
       d.fishPond={
         currentFish:       isNew?Math.floor(Math.random()*FISH_LIST.length):(old.currentFish||0),
-        friendships:       old.friendships||[],
+        friendships:       isNew?[defaultFriend]:(old.friendships||[]),
         currentFriendship: old.currentFriendship||0,
         lastFedDate:       old.lastFedDate||"",
       };
+      if(isNew) setTimeout(()=>setNewFriendCeremony({index:defaultFriendIdx,isFirst:true}),1200);
     } else {
-      // Strip obsolete fields
       const{isHealthy,consecutiveFed,consecutiveMissed,...rest}=d.fishPond;
+      if(!(rest.friendships||[]).length){
+        const idx=Math.floor(Math.random()*FISH_LIST.length);
+        rest.friendships=[{index:idx,nickname:"",friendDay:""}];
+        setTimeout(()=>setNewFriendCeremony({index:idx,isFirst:true}),1200);
+      }
       d.fishPond=rest;
     }
     // Migrate longStats: add growth if missing
@@ -1442,6 +1547,15 @@ function App(){
               <div style={S.cl}>💾 数据管理</div>
               <div style={{fontSize:12,color:"#B09070",marginBottom:10}}>包含离岛旅行、岛上新闻、历史记录等全部数据</div>
               <button style={{...S.cfmBtn,marginBottom:10}} onClick={()=>exportData(s)}>{t("📤 导出数据备份","📤 Export Backup")}</button>
+              {(s.fishPond?.friendships||[]).length===0&&(
+                <button style={{...S.cfmBtn,marginBottom:10,background:"#4A9EC8"}} onClick={()=>{
+                  const idx=Math.floor(Math.random()*FISH_LIST.length);
+                  const fp=s.fishPond||{};
+                  save({...s,fishPond:{...fp,friendships:[{index:idx,nickname:"",friendDay:""}]}});
+                  setShowSettings(false);
+                  setTimeout(()=>setNewFriendCeremony({index:idx,isFirst:true}),300);
+                }}>🐟 领取初始朋友鱼</button>
+              )}
               <button style={{...S.cfmBtn,background:"linear-gradient(135deg,#70B8E0,#5BAF5F)"}} onClick={()=>importRef.current?.click()}>{t("📥 导入数据","📥 Import Data")}</button>
               <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={e=>{if(!e.target.files[0])return;importData(e.target.files[0],handleImport,err=>pop(`❌ 导入失败：${err}`));e.target.value="";}}/>
               <div style={{fontSize:11,color:"#B09070",marginTop:8,textAlign:"center"}}>导入将覆盖现有数据，请先导出备份</div>
@@ -1760,28 +1874,6 @@ function App(){
                     })}
                   </div>
                 </div>
-                {/* 已成为朋友的鱼 */}
-                {friends.length>0&&(
-                  <div>
-                    <div style={{fontSize:11,color:"#7A5C44",fontWeight:800,marginBottom:8}}>🫧 已成为朋友的鱼</div>
-                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                      {friends.map((f,i)=>{
-                        const fish=FISH_LIST[f.index]||{emoji:"🐟",name:"鱼"};
-                        const name=f.nickname||fish.name;
-                        return(
-                          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,background:"#FAFFF8",border:"1.5px solid #C8E8C8"}}>
-                            <span style={{fontSize:22}}>{fish.emoji}</span>
-                            <div style={{flex:1}}>
-                              <span style={{fontSize:13,fontWeight:800,color:"#2A5A30"}}>{name}</span>
-                              {f.nickname&&<span style={{fontSize:10,color:"#8AAA80",marginLeft:6}}>{fish.name}</span>}
-                            </div>
-                            {f.friendDay&&<span style={{fontSize:10,color:"#B09070"}}>{f.friendDay.slice(5).replace("/",".")}</span>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
               </ACCard>
             );
           })()}
@@ -1881,7 +1973,10 @@ function App(){
               return(
                 <div style={{marginBottom:16,padding:"14px 16px",background:"linear-gradient(135deg,#EEF9FF,#E0F4FF)",borderRadius:18,border:"2px solid #B8DFF5"}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:alreadyFed||!isMorning?0:10}}>
-                    <span style={{fontSize:24}}>{fish.emoji}</span>
+                    {isMorning&&!alreadyFed
+                      ?<div style={{width:48,height:48,flexShrink:0}} dangerouslySetInnerHTML={{__html:fishSVG(fp.currentFish||0,48)||fish.emoji}}/>
+                      :<span style={{fontSize:32}}>{fish.emoji}</span>
+                    }
                     <div style={{flex:1}}>
                       <div style={{fontSize:11,fontWeight:800,color:"#2A6080"}}>{fish.name}鱼群</div>
                       <div style={{fontSize:11,color:"#5A8FA8",marginTop:1,lineHeight:1.4}}>{msg}</div>
@@ -1898,7 +1993,7 @@ function App(){
                             save({...s,fishPond:newFp,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
                             const line=FEED_LINES[Math.floor(Math.random()*FEED_LINES.length)];
                             pop(`${FISH_LIST[fp.currentFish||0].emoji} ${line} 🌸+1`);
-                            if(becameFriend) setTimeout(()=>setModal("fishNickname"),600);
+                            if(becameFriend) setTimeout(()=>setNewFriendCeremony({index:fp.currentFish||0,isFirst:false}),600);
                           }}>
                           🐟 喂鱼 · 🌸+1
                         </button>
@@ -1953,8 +2048,7 @@ function App(){
         <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setModal(null)}>
           <div style={{background:"#FFFDF5",borderRadius:28,padding:"24px 20px",width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #B8DFF5",animation:"pop .25s ease",maxHeight:"75vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{textAlign:"center",marginBottom:18}}>
-              <div style={{fontSize:22,fontWeight:900,color:"#1A5A7A"}}>🫧 鱼池朋友</div>
-              <div style={{fontSize:12,color:"#8AAAB8",marginTop:4}}>在这里的都是老朋友了</div>
+              <div style={{fontSize:22,fontWeight:900,color:"#1A5A7A"}}>🫧 常驻朋友</div>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {(s.fishPond?.friendships||[]).map((f,i)=>{
@@ -1962,8 +2056,8 @@ function App(){
                 const name=f.nickname||fish.name;
                 const healthy=s.fishPond?.isHealthy!==false;
                 return(
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:16,background:"linear-gradient(135deg,#F0FAFF,#E8F5FF)",border:"1.5px solid #C0DCED"}}>
-                    <span style={{fontSize:28,filter:healthy?"none":"grayscale(.6) opacity(.7)"}}>{fish.emoji}</span>
+                  <div key={i} onClick={()=>{setModal(null);setTimeout(()=>setPetFish(f),50);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:16,background:"linear-gradient(135deg,#F0FAFF,#E8F5FF)",border:"1.5px solid #C0DCED",cursor:"pointer"}}>
+                    <div style={{width:40,height:40,flexShrink:0}} dangerouslySetInnerHTML={{__html:fishSVG(f.index,40)||fish.emoji}}/>
                     <div style={{flex:1}}>
                       <div style={{fontSize:14,fontWeight:900,color:"#1A5A7A"}}>{name}</div>
                       {f.nickname&&<div style={{fontSize:11,color:"#8AAAB8"}}>{fish.name}</div>}
@@ -1979,34 +2073,133 @@ function App(){
 
       {modal==="fishNickname"&&s&&(()=>{
         const fp=s.fishPond||{};
-        const prevIdx=(fp.currentFish||1)-1;
-        const prevFish=FISH_LIST[prevIdx]||FISH_LIST[0];
+        const targetIdx=nicknameFishIdx!=null?nicknameFishIdx:Math.max(0,(fp.currentFish||1)-1);
+        const prevFish=FISH_LIST[targetIdx]||FISH_LIST[0];
         const friends=fp.friendships||[];
-        const thisFriend=friends.find(f=>f.index===prevIdx);
+        const thisFriend=friends.find(f=>f.index===targetIdx);
         const [nick,setNick]=useState(thisFriend?.nickname||"");
         return(
-          <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setModal(null)}>
+          <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:220,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setModal(null)}>
             <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px 24px",width:"100%",maxWidth:380,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #B8DFF5",animation:"pop .25s ease"}} onClick={e=>e.stopPropagation()}>
               <div style={{textAlign:"center",marginBottom:20}}>
-                <div style={{fontSize:40,marginBottom:8}}>{prevFish.emoji}</div>
-                <div style={{fontSize:17,fontWeight:900,color:"#1A5A7A"}}>你们成为朋友了！</div>
-                <div style={{fontSize:12,color:"#5A8FA8",marginTop:6}}>给这只{prevFish.name}起个昵称吧</div>
+                <div style={{marginBottom:8,display:"flex",justifyContent:"center"}} dangerouslySetInnerHTML={{__html:fishSVG(targetIdx,56)}}/>
+                <div style={{fontSize:17,fontWeight:900,color:"#1A5A7A"}}>给它起个名字吧</div>
+                <div style={{fontSize:12,color:"#5A8FA8",marginTop:6}}>{prevFish.name}</div>
               </div>
               <input
                 value={nick} onChange={e=>setNick(e.target.value)}
-                placeholder={`留空则使用默认名「${prevFish.name}」`}
+                placeholder={`留空则使用「${prevFish.name}」`}
                 style={{width:"100%",padding:"10px 14px",borderRadius:14,border:"2px solid #B8DFF5",fontSize:14,background:"#F5FBFF",boxSizing:"border-box",outline:"none",marginBottom:14}}
               />
               <div style={{display:"flex",gap:8}}>
                 <button style={{flex:1,padding:"10px 0",borderRadius:14,background:"#EEF5EE",color:"#7A5C44",fontWeight:700,fontSize:13,border:"2px solid #C8E0C8",cursor:"pointer"}}
                   onClick={()=>setModal(null)}>跳过</button>
                 <button style={{flex:2,...S.cfmBtn,margin:0}} onClick={()=>{
-                  const newFriends=(fp.friendships||[]).map(f=>f.index===prevIdx?{...f,nickname:nick.trim()}:f);
+                  const newFriends=(fp.friendships||[]).map(f=>f.index===targetIdx?{...f,nickname:nick.trim()}:f);
                   save({...s,fishPond:{...fp,friendships:newFriends}});
                   setModal(null);
-                  pop(`🐟 ${nick.trim()||prevFish.name} 已加入你的鱼池！`);
-                }}>确认昵称 🐟</button>
+                  pop(`🐟 ${nick.trim()||prevFish.name} 已加入常驻！`);
+                }}>确认 🐟</button>
               </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 成为朋友仪式弹窗 */}
+      {newFriendCeremony&&s&&(()=>{
+        const fish=FISH_LIST[newFriendCeremony.index]||FISH_LIST[0];
+        const isFirst=newFriendCeremony.isFirst;
+        return(
+          <div style={{position:"fixed",inset:0,background:"rgba(8,16,36,.85)",zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 28px"}}>
+            <style>{`
+              @keyframes ceremonyFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+              @keyframes ceremonyFadeIn{from{opacity:0;transform:scale(.85);}to{opacity:1;transform:scale(1);}}
+              @keyframes bubbleUp{0%{transform:translateY(0) scale(1);opacity:.8;}100%{transform:translateY(-60px) scale(.4);opacity:0;}}
+              .ceremony-fish{animation:ceremonyFloat 2.4s ease-in-out infinite;}
+              .ceremony-wrap{animation:ceremonyFadeIn .5s cubic-bezier(.34,1.56,.64,1) forwards;}
+            `}</style>
+            <div className="ceremony-wrap" style={{display:"flex",flexDirection:"column",alignItems:"center",gap:20,maxWidth:320,width:"100%"}}>
+              {/* 气泡装饰 */}
+              <div style={{position:"relative",width:140,height:140,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {[...Array(6)].map((_,i)=>(
+                  <div key={i} style={{
+                    position:"absolute",
+                    width:i%2===0?8:5,height:i%2===0?8:5,
+                    borderRadius:"50%",
+                    background:"rgba(100,200,255,.4)",
+                    left:`${15+i*14}%`,bottom:`${10+i*8}%`,
+                    animation:`bubbleUp ${1.5+i*.4}s ease-out ${i*.3}s infinite`,
+                  }}/>
+                ))}
+                <div className="ceremony-fish" style={{filter:"drop-shadow(0 0 20px rgba(80,180,255,.6))"}}>
+                  <div dangerouslySetInnerHTML={{__html:fishSVG(newFriendCeremony.index,110)}}/>
+                </div>
+              </div>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:11,color:"rgba(150,210,255,.6)",letterSpacing:3,marginBottom:10}}>
+                  {isFirst?"一条鱼来到了你的小岛":"友好度已满"}
+                </div>
+                <div style={{fontSize:22,fontWeight:900,color:"#fff",marginBottom:6}}>{fish.name}</div>
+                <div style={{fontSize:13,color:"rgba(180,220,255,.8)"}}>
+                  {isFirst?"它决定留下来陪你":"成为了你的常驻朋友"}
+                </div>
+              </div>
+              {(()=>{
+                const confirm=()=>{
+                  const fp=s.fishPond||{};
+                  const newFriends=(fp.friendships||[]).map(f=>f.index===newFriendCeremony.index?{...f,nickname:ceremonyNick.trim()}:f);
+                  save({...s,fishPond:{...fp,friendships:newFriends}});
+                  setNewFriendCeremony(null);
+                  setCeremonyNick("");
+                  if(ceremonyNick.trim()) pop(`🐟 ${ceremonyNick.trim()} 已加入常驻！`);
+                };
+                return(<>
+                  <input value={ceremonyNick} onChange={e=>setCeremonyNick(e.target.value)}
+                    placeholder="给它起个名字（可跳过）"
+                    onKeyDown={e=>e.key==="Enter"&&confirm()}
+                    style={{width:"100%",padding:"10px 14px",borderRadius:14,border:"2px solid rgba(100,180,255,.4)",fontSize:14,background:"rgba(255,255,255,.1)",color:"#fff",boxSizing:"border-box",outline:"none"}}
+                  />
+                  <button style={{
+                    width:"100%",padding:"12px 0",borderRadius:20,
+                    background:"linear-gradient(135deg,#4A9EC8,#2A70A0)",
+                    color:"#fff",fontWeight:800,fontSize:14,border:"none",cursor:"pointer",
+                    boxShadow:"0 4px 20px rgba(60,140,200,.4)",
+                  }} onClick={confirm}>好的 🐟</button>
+                </>);
+              })()}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 摸鱼弹窗 */}
+      {petFish&&s&&(()=>{
+        const fish=FISH_LIST[petFish.index]||FISH_LIST[0];
+        const name=petFish.nickname||fish.name;
+        return(
+          <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,.7)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setPetFish(null)}>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:13,color:"rgba(200,230,255,.6)",letterSpacing:2}}>点一点</div>
+              <style>{`
+                @keyframes fishSwim{0%{transform:translateX(-4px) rotate(-4deg);}100%{transform:translateX(4px) rotate(4deg);}}
+                @keyframes fishPoke{0%{transform:scale(1);}30%{transform:scale(1.18) rotate(-8deg);}60%{transform:scale(.95) rotate(5deg);}100%{transform:scale(1) rotate(0deg);}}
+                .fish-idle{animation:fishSwim .9s ease-in-out infinite alternate;}
+                .fish-poke{animation:fishPoke .45s ease forwards;}
+              `}</style>
+              <div
+                id="petFishEl"
+                className="fish-idle"
+                style={{cursor:"pointer",filter:"drop-shadow(0 8px 24px rgba(80,180,255,.4))"}}
+                onClick={()=>{
+                  const el=document.getElementById('petFishEl');
+                  if(!el)return;
+                  el.className='fish-poke';
+                  setTimeout(()=>{el.className='fish-idle';},460);
+                }}
+                dangerouslySetInnerHTML={{__html:fishSVG(petFish.index,120)}}
+              />
+              <div style={{fontSize:14,fontWeight:800,color:"rgba(200,230,255,.9)",letterSpacing:1}}>{name}</div>
             </div>
           </div>
         );
