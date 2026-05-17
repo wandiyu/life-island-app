@@ -1291,8 +1291,7 @@ function App(){
     dbSet(d);setS(d);
     // 签到检测：每天05:00后首次打开时弹出
     const morningKey=`morningCheckin_${today}`;
-    const nowHour=new Date().getHours();
-    if(!localStorage.getItem(morningKey)&&nowHour>=5){
+    if(!localStorage.getItem(morningKey)&&h>=5){
       // 初始值取当前 shortStats（可能已被重置为80）
       setMorningVals({
         mood:      d.shortStats.mood?.value      ?? 80,
