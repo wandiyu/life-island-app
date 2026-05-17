@@ -628,10 +628,10 @@ const getWeekSaturday = ()=>{
   return sat;
 };
 
-// Count how many times a habit was checked this week (Sun–Sat)
-const countWeekChecks=(checkedHabits,habitId)=>{
+// Count how many times a habit was checked in the week containing refDate (Sun–Sat)
+const countWeekChecks=(checkedHabits,habitId,refDate=new Date())=>{
   let count=0;
-  const now=new Date();
+  const now=new Date(refDate);
   const day=now.getDay();
   const sunday=new Date(now);sunday.setDate(now.getDate()-day);
   for(let i=0;i<=6;i++){
@@ -656,12 +656,14 @@ const migrateWeeklyBonus=(h)=>{
 
 // Run weekly settlement - returns {newLongStats, extraFlowers, gains}
 const runWeeklySettle=(habits,checkedHabits,longStats)=>{
+  // 结算上周（周日触发时，上周六是昨天）
+  const lastSat=new Date();lastSat.setDate(lastSat.getDate()-1);
   const gains=[];
   let bonusMap={};
   habits.forEach(h=>{
     const stats=h.weeklyBonus?.stats||[];
     const target=h.weeklyTarget||5;
-    const cnt=countWeekChecks(checkedHabits,h.id);
+    const cnt=countWeekChecks(checkedHabits,h.id,lastSat);
     if(cnt>=target&&stats.length>0){
       stats.forEach(stat=>{
         if(!longStats[stat])return;
@@ -1287,9 +1289,10 @@ function App(){
     d={...d,fishPond:updateFishMissed(d.fishPond,today)};
 
     dbSet(d);setS(d);
-    // 签到检测：每天首次打开时弹出
+    // 签到检测：每天05:00后首次打开时弹出
     const morningKey=`morningCheckin_${today}`;
-    if(!localStorage.getItem(morningKey)){
+    const nowHour=new Date().getHours();
+    if(!localStorage.getItem(morningKey)&&nowHour>=5){
       // 初始值取当前 shortStats（可能已被重置为80）
       setMorningVals({
         mood:      d.shortStats.mood?.value      ?? 80,
@@ -1742,6 +1745,8 @@ function App(){
           {(()=>{
             const morningKey=`morningCheckin_${today}`;
             const done=!!localStorage.getItem(morningKey);
+            const nowHour=new Date().getHours();
+            if(nowHour<5&&!done) return null; // 5:00前不显示
             return(
               <div onClick={done?undefined:()=>{
                 setMorningVals({
@@ -1884,6 +1889,7 @@ function App(){
             dayColors={s.dayColors||{}}
             daySummaries={s.daySummaries||{}}
             bigEvents={s.bigEvents||[]}
+            checkedHabits={s.checkedHabits||{}}
             today={today}
             todaySnap={{date:today,long:s.longStats,short:s.shortStats,level:s.player.level}}
             onPickColor={(dateKey,color)=>save({...s,dayColors:{...(s.dayColors||{}),[dateKey]:color}})}
@@ -2525,42 +2531,43 @@ function TodayEntry({today,dayColors,daySummaries,onPickColor,onSaveSummary}){
 }
 
 // ─── ColorCalendar: 颜色日历回望 ──────────────────────────
-function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap,onPickColor,onSaveSummary}){
+function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,today,todaySnap,onPickColor,onSaveSummary}){
   const [selected,setSelected]=useState(null); // dateKey or null
   const [open,setOpen]=useState(false);
   const [trendMode,setTrendMode]=useState(false);
 
   // All stat definitions for trend selector
   const TREND_STATS=[
-    {k:"health",  label:"健康", icon:"🌿", color:"#5BAF5F",  src:"long"},
-    {k:"wealth",  label:"财富", icon:"💰", color:"#E8A020",  src:"long"},
-    {k:"social",  label:"友情", icon:"🤝", color:"#70B8E0",  src:"long"},
-    {k:"growth",  label:"成长", icon:"📚", color:"#8B5CF6",  src:"long"},
-    {k:"mood",    label:"心情", icon:"☀️", color:"#FF9A5C",  src:"short"},
-    {k:"energy",  label:"体力", icon:"⚡", color:"#7BC67E",  src:"short"},
-    {k:"cognition",label:"脑力",icon:"🧠", color:"#70B8E0",  src:"short"},
+    {k:"checkins", label:"打卡", icon:"✅", color:"#a7c957", src:"checkins"},
+    {k:"mood",     label:"心情", icon:"☀️", color:"#FF9A5C", src:"short"},
+    {k:"energy",   label:"体力", icon:"⚡", color:"#7BC67E", src:"short"},
+    {k:"cognition",label:"脑力", icon:"🧠", color:"#70B8E0", src:"short"},
+    {k:"health",   label:"健康", icon:"🌿", color:"#5BAF5F", src:"long"},
+    {k:"wealth",   label:"财富", icon:"💰", color:"#E8A020", src:"long"},
+    {k:"social",   label:"友情", icon:"🤝", color:"#70B8E0", src:"long"},
+    {k:"growth",   label:"成长", icon:"📚", color:"#8B5CF6", src:"long"},
   ];
-  const [trendStat,setTrendStat]=useState("health");
+  const [trendStat,setTrendStat]=useState("checkins");
   const activeStat=TREND_STATS.find(s=>s.k===trendStat)||TREND_STATS[0];
 
   // Build last-30-days trend data
   const trendData=useMemo(()=>{
-    // collect all days including today
     const allEntries=[
       {date:today, long:todaySnap.long, short:todaySnap.short},
       ...(history||[]),
     ];
-    // index by date
     const byDate={};
     allEntries.forEach(e=>{if(e.date)byDate[e.date]=e;});
-    // last 30 calendar days newest→oldest then reverse for chart
     const days=[];
     for(let i=29;i>=0;i--){
       const d=new Date(); d.setDate(d.getDate()-i);
       const dk=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
       const entry=byDate[dk];
       let val=null;
-      if(entry){
+      if(activeStat.src==="checkins"){
+        const dayChecks=checkedHabits?.[dk];
+        if(dayChecks) val=Object.keys(dayChecks).length;
+      } else if(entry){
         const src=activeStat.src==="long"?entry.long:entry.short;
         if(src&&src[trendStat]!=null){
           val=typeof src[trendStat]==="object"?src[trendStat].value:src[trendStat];
@@ -2569,25 +2576,32 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap
       days.push({dk, label:`${d.getMonth()+1}/${d.getDate()}`, val});
     }
     return days;
-  },[history,today,todaySnap,trendStat,activeStat]);
+  },[history,today,todaySnap,trendStat,activeStat,checkedHabits]);
 
   // SVG chart dimensions
   const W=320,H=120,PL=28,PR=10,PT=10,PB=24;
   const CW=W-PL-PR, CH=H-PT-PB;
   const hasData=trendData.some(d=>d.val!==null);
 
+  // Y axis: 0-100 for stats, dynamic for checkins
+  const isCheckins=activeStat.src==="checkins";
+  const yMax=isCheckins?Math.max(5,...trendData.map(d=>d.val||0)):100;
+  const yTicks=isCheckins
+    ?[0,Math.round(yMax/2),yMax]
+    :[0,25,50,75,100];
+
   // Build polyline segments (break on null)
   const segments=useMemo(()=>{
     const segs=[]; let cur=[];
     trendData.forEach((d,i)=>{
       const x=PL+i*(CW/(trendData.length-1));
-      const y=d.val!==null?PT+CH-(d.val/100)*CH:null;
+      const y=d.val!==null?PT+CH-(d.val/yMax)*CH:null;
       if(y!==null){cur.push({x,y,d});}
       else if(cur.length){segs.push(cur);cur=[];}
     });
     if(cur.length)segs.push(cur);
     return segs;
-  },[trendData]);
+  },[trendData,yMax]);
 
   // X-axis labels: show ~6 evenly spaced
   const xLabels=trendData.filter((_,i)=>i===0||i===29||i%6===0);
@@ -2660,10 +2674,10 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap
             ?<div style={{textAlign:"center",padding:"24px 0",fontSize:13,color:"#B09070"}}>暂无数据，记录几天后这里会出现趋势 🌱</div>
             :<svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:"visible"}}>
               {/* Y轴刻度线 */}
-              {[0,25,50,75,100].map(v=>{
-                const y=PT+CH-(v/100)*CH;
+              {yTicks.map(v=>{
+                const y=PT+CH-(v/yMax)*CH;
                 return<g key={v}>
-                  <line x1={PL} y1={y} x2={W-PR} y2={y} stroke="#E8E8E0" strokeWidth="1" strokeDasharray={v===0||v===100?"":"3,3"}/>
+                  <line x1={PL} y1={y} x2={W-PR} y2={y} stroke="#E8E8E0" strokeWidth="1" strokeDasharray={v===0||v===yMax?"":"3,3"}/>
                   <text x={PL-4} y={y+3.5} textAnchor="end" fontSize="7" fill="#C0B090">{v}</text>
                 </g>;
               })}
@@ -2677,7 +2691,7 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,today,todaySnap
               {trendData.map((d,i)=>{
                 if(d.val===null)return null;
                 const x=PL+i*(CW/(trendData.length-1));
-                const y=PT+CH-(d.val/100)*CH;
+                const y=PT+CH-(d.val/yMax)*CH;
                 return<circle key={i} cx={x} cy={y} r="3" fill={activeStat.color} stroke="#fff" strokeWidth="1.5"/>;
               })}
               {/* X轴标签 */}
