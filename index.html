@@ -2617,9 +2617,12 @@ function TodayEntry({today,dayColors,daySummaries,onPickColor,onSaveSummary}){
 
 // ─── ColorCalendar: 颜色日历回望 ──────────────────────────
 function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,cbtLog,today,todaySnap,onPickColor,onSaveSummary,onCbt}){
-  const [selected,setSelected]=useState(null); // dateKey or null
+  const [selected,setSelected]=useState(null);
   const [open,setOpen]=useState(false);
   const [trendMode,setTrendMode]=useState(false);
+  const [todayPickerOpen,setTodayPickerOpen]=useState(false);
+  const [todayEditSum,setTodayEditSum]=useState(false);
+  const [todaySumDraft,setTodaySumDraft]=useState("");
 
   // All stat definitions for trend selector
   const TREND_STATS=[
@@ -2749,35 +2752,32 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
         const cbtKey=today.replace(/\//g,"-");
         const cbtDone=!!(cbtLog&&cbtLog[cbtKey]);
         const tc=textOnBg(todayBg);
-        const [pickerOpen,setPickerOpen]=useState(false);
-        const [editSum,setEditSum]=useState(false);
-        const [sumDraft,setSumDraft]=useState(todaySummary);
         return(
           <div style={{background:todayBg||"#F8FFF4",borderRadius:16,padding:"12px 14px",border:`2px solid ${todayBg?tc+"33":"#D4EED4"}`,marginBottom:14,transition:"background .3s"}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               {/* 颜色圆 */}
               <div style={{position:"relative",flexShrink:0}}>
-                <div onClick={()=>setPickerOpen(p=>!p)}
-                  style={{width:26,height:26,borderRadius:"50%",background:todayBg||"#E8F5E8",border:`2.5px solid ${todayBg?tc+"66":"#A8D8A8"}`,cursor:"pointer",boxShadow:pickerOpen?`0 0 0 3px ${todayBg||"#7BC67E"}55`:"none",transition:"box-shadow .2s"}}/>
-                {pickerOpen&&(
+                <div onClick={()=>setTodayPickerOpen(p=>!p)}
+                  style={{width:26,height:26,borderRadius:"50%",background:todayBg||"#E8F5E8",border:`2.5px solid ${todayBg?tc+"66":"#A8D8A8"}`,cursor:"pointer",boxShadow:todayPickerOpen?`0 0 0 3px ${todayBg||"#7BC67E"}55`:"none",transition:"box-shadow .2s"}}/>
+                {todayPickerOpen&&(
                   <div style={{position:"absolute",top:34,left:0,zIndex:30,background:"#fff",borderRadius:14,padding:10,boxShadow:"0 4px 20px rgba(0,0,0,.15)",border:"1.5px solid #E0E0D8",width:190}}>
                     <div style={{fontSize:10,fontWeight:700,color:"#B09070",marginBottom:8}}>🎨 选择今天的颜色</div>
                     <div style={{display:"grid",gridTemplateColumns:"repeat(9,1fr)",gap:4,marginBottom:6}}>
                       {DAY_PALETTE.map(c=>(
-                        <div key={c} onClick={()=>{onPickColor(today,c);setPickerOpen(false);}}
+                        <div key={c} onClick={()=>{onPickColor(today,c);setTodayPickerOpen(false);}}
                           style={{width:"100%",aspectRatio:"1",borderRadius:5,background:c,cursor:"pointer",border:`2px solid ${todayBg===c?"#3D2B1F":"rgba(0,0,0,.08)"}`}}/>
                       ))}
                     </div>
-                    {todayBg&&<button onClick={()=>{onPickColor(today,"");setPickerOpen(false);}} style={{fontSize:11,color:"#888",background:"none",border:"none",cursor:"pointer",fontWeight:700,textDecoration:"underline"}}>清除颜色</button>}
+                    {todayBg&&<button onClick={()=>{onPickColor(today,"");setTodayPickerOpen(false);}} style={{fontSize:11,color:"#888",background:"none",border:"none",cursor:"pointer",fontWeight:700,textDecoration:"underline"}}>清除颜色</button>}
                   </div>
                 )}
               </div>
               {/* 一句话 */}
-              <div style={{flex:1}} onClick={()=>{setSumDraft(todaySummary);setEditSum(true);}}>
-                {editSum
-                  ?<input autoFocus value={sumDraft} onChange={e=>setSumDraft(e.target.value)}
-                      onBlur={()=>{onSaveSummary(today,sumDraft);setEditSum(false);}}
-                      onKeyDown={e=>{if(e.key==="Enter"){onSaveSummary(today,sumDraft);setEditSum(false);}}}
+              <div style={{flex:1}} onClick={()=>{setTodaySumDraft(todaySummary);setTodayEditSum(true);}}>
+                {todayEditSum
+                  ?<input autoFocus value={todaySumDraft} onChange={e=>setTodaySumDraft(e.target.value)}
+                      onBlur={()=>{onSaveSummary(today,todaySumDraft);setTodayEditSum(false);}}
+                      onKeyDown={e=>{if(e.key==="Enter"){onSaveSummary(today,todaySumDraft);setTodayEditSum(false);}}}
                       style={{width:"100%",border:"none",borderBottom:`2px solid ${todayBg?tc+"88":"#a7c957"}`,outline:"none",background:"transparent",fontSize:13,color:todayBg?tc:"#3D2B1F",fontFamily:"inherit"}}/>
                   :<span style={{fontSize:13,color:todaySummary?(todayBg?tc:"#3D2B1F"):"#C8A880",fontStyle:todaySummary?"normal":"italic",cursor:"text"}}>
                     {todaySummary||"✏️ 点击添加一句话总结…"}
