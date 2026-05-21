@@ -1164,7 +1164,10 @@ function App(){
   const [nicknameFishIdx, setNicknameFishIdx]  = useState(null);
   const [ceremonyNick,    setCeremonyNick]     = useState("");
   const [showCbt,         setShowCbt]          = useState(false);
-  const [cbtVals,         setCbtVals]          = useState({thoughts:0,feelings:0,behaviors:0}); // {index, nickname}
+  const [cbtVals,         setCbtVals]          = useState({thoughts:0,feelings:0,behaviors:0});
+  const [cbtColor,        setCbtColor]         = useState("");
+  const [cbtSummary,      setCbtSummary]       = useState("");
+  const [cbtPickerOpen,   setCbtPickerOpen]    = useState(false); // {index, nickname}
   const popT     = useRef(null);
   const importRef= useRef(null);
 
@@ -1906,7 +1909,14 @@ function App(){
             todaySnap={{date:today,long:s.longStats,short:s.shortStats,level:s.player.level}}
             onPickColor={(dateKey,color)=>save({...s,dayColors:{...(s.dayColors||{}),[dateKey]:color}})}
             onSaveSummary={(dateKey,text)=>save({...s,daySummaries:{...(s.daySummaries||{}),[dateKey]:text}})}
-            onCbt={()=>{setCbtVals({thoughts:0,feelings:0,behaviors:0});setShowCbt(true);}}
+            onCbt={()=>{
+              const td=todayKey();
+              setCbtVals({thoughts:0,feelings:0,behaviors:0});
+              setCbtColor(s.dayColors?.[td]||"");
+              setCbtSummary(s.daySummaries?.[td]||"");
+              setCbtPickerOpen(false);
+              setShowCbt(true);
+            }}
           />
 
           {/* 大事记录：今日 + 标签搜索全部历史 */}
@@ -1975,7 +1985,12 @@ function App(){
               const newTags=[...new Set([...existingTags,"cbt"])];
               const ev={id:Date.now(),date:td,text,xp:1,statChanges:{},tag:"cbt"};
               let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
-              save({...s,cbtLog:newCbt,eventTags:newTags,bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+              // 同时保存颜色和总结
+              const newDayColors=cbtColor?{...(s.dayColors||{}),[td]:cbtColor}:(s.dayColors||{});
+              const newDaySummaries=cbtSummary.trim()?{...(s.daySummaries||{}),[td]:cbtSummary.trim()}:(s.daySummaries||{});
+              save({...s,cbtLog:newCbt,eventTags:newTags,bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),
+                player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
+                dayColors:newDayColors,daySummaries:newDaySummaries});
               setShowCbt(false);
               pop("🌙 复盘完成！🌸+1");
             }}>记录今天 🌙</button>
@@ -2721,16 +2736,62 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
             style={{fontSize:11,fontWeight:800,color:trendMode?"#fff":"#5BAF5F",background:trendMode?"#5BAF5F":"#F0FFF0",border:`2px solid #A8D8A8`,borderRadius:14,padding:"3px 10px",cursor:"pointer"}}>
             {trendMode?"◀":"📈"}
           </button>
-          {!trendMode&&(()=>{
-            const cbtKey=today.replace(/\//g,"-");
-            const cbtDone=!!(cbtLog&&cbtLog[cbtKey]);
-            return <button onClick={onCbt} style={{fontSize:11,fontWeight:800,color:cbtDone?"#fff":"#5BAF5F",background:cbtDone?"#5BAF5F":"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"3px 10px",cursor:"pointer"}}>🌙</button>;
-          })()}
           {!trendMode&&<button onClick={()=>setOpen(o=>!o)} style={{fontSize:11,fontWeight:800,color:"#5BAF5F",background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"3px 12px",cursor:"pointer"}}>
             {open?"▲":"▼"}
           </button>}
         </div>
       </div>
+
+      {/* ── 今天区块（收藏视图）── */}
+      {!trendMode&&(()=>{
+        const todayBg=dayColors[today]||null;
+        const todaySummary=daySummaries[today]||"";
+        const cbtKey=today.replace(/\//g,"-");
+        const cbtDone=!!(cbtLog&&cbtLog[cbtKey]);
+        const tc=textOnBg(todayBg);
+        const [pickerOpen,setPickerOpen]=useState(false);
+        const [editSum,setEditSum]=useState(false);
+        const [sumDraft,setSumDraft]=useState(todaySummary);
+        return(
+          <div style={{background:todayBg||"#F8FFF4",borderRadius:16,padding:"12px 14px",border:`2px solid ${todayBg?tc+"33":"#D4EED4"}`,marginBottom:14,transition:"background .3s"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              {/* 颜色圆 */}
+              <div style={{position:"relative",flexShrink:0}}>
+                <div onClick={()=>setPickerOpen(p=>!p)}
+                  style={{width:26,height:26,borderRadius:"50%",background:todayBg||"#E8F5E8",border:`2.5px solid ${todayBg?tc+"66":"#A8D8A8"}`,cursor:"pointer",boxShadow:pickerOpen?`0 0 0 3px ${todayBg||"#7BC67E"}55`:"none",transition:"box-shadow .2s"}}/>
+                {pickerOpen&&(
+                  <div style={{position:"absolute",top:34,left:0,zIndex:30,background:"#fff",borderRadius:14,padding:10,boxShadow:"0 4px 20px rgba(0,0,0,.15)",border:"1.5px solid #E0E0D8",width:190}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"#B09070",marginBottom:8}}>🎨 选择今天的颜色</div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(9,1fr)",gap:4,marginBottom:6}}>
+                      {DAY_PALETTE.map(c=>(
+                        <div key={c} onClick={()=>{onPickColor(today,c);setPickerOpen(false);}}
+                          style={{width:"100%",aspectRatio:"1",borderRadius:5,background:c,cursor:"pointer",border:`2px solid ${todayBg===c?"#3D2B1F":"rgba(0,0,0,.08)"}`}}/>
+                      ))}
+                    </div>
+                    {todayBg&&<button onClick={()=>{onPickColor(today,"");setPickerOpen(false);}} style={{fontSize:11,color:"#888",background:"none",border:"none",cursor:"pointer",fontWeight:700,textDecoration:"underline"}}>清除颜色</button>}
+                  </div>
+                )}
+              </div>
+              {/* 一句话 */}
+              <div style={{flex:1}} onClick={()=>{setSumDraft(todaySummary);setEditSum(true);}}>
+                {editSum
+                  ?<input autoFocus value={sumDraft} onChange={e=>setSumDraft(e.target.value)}
+                      onBlur={()=>{onSaveSummary(today,sumDraft);setEditSum(false);}}
+                      onKeyDown={e=>{if(e.key==="Enter"){onSaveSummary(today,sumDraft);setEditSum(false);}}}
+                      style={{width:"100%",border:"none",borderBottom:`2px solid ${todayBg?tc+"88":"#a7c957"}`,outline:"none",background:"transparent",fontSize:13,color:todayBg?tc:"#3D2B1F",fontFamily:"inherit"}}/>
+                  :<span style={{fontSize:13,color:todaySummary?(todayBg?tc:"#3D2B1F"):"#C8A880",fontStyle:todaySummary?"normal":"italic",cursor:"text"}}>
+                    {todaySummary||"✏️ 点击添加一句话总结…"}
+                  </span>
+                }
+              </div>
+              {/* 复盘按钮 */}
+              <button onClick={onCbt} style={{fontSize:13,padding:"4px 10px",borderRadius:12,border:"2px solid #A8D8A8",background:cbtDone?"#5BAF5F":"#F0FFF0",color:cbtDone?"#fff":"#5BAF5F",fontWeight:800,cursor:"pointer",flexShrink:0}}>
+                🌙{cbtDone?" ✓":""}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── 趋势视图 ── */}
       {trendMode&&(
@@ -2795,7 +2856,7 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
           <div key={mk} style={{marginBottom:14}}>
             <div style={{fontSize:10,color:"#B09070",fontWeight:800,marginBottom:8,letterSpacing:1}}>{mk.replace("/","年").replace("/","月")} 月</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-              {days.map(d=>{
+              {days.filter(d=>!d.isToday).map(d=>{
                 const bg=dayColors[d.date]||null;
                 const hasSummary=!!(daySummaries[d.date]);
                 const isSelected=selected===d.date;
