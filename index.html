@@ -588,7 +588,9 @@ const INIT={
     friendships:        [],
     currentFriendship:  0,
     lastFedDate:        "",
-  },};
+  },
+  cbtLog: {},
+};
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
 const applyB = (stats,bonus={})=>{
@@ -1160,7 +1162,9 @@ function App(){
   const [petFish,         setPetFish]         = useState(null);
   const [newFriendCeremony, setNewFriendCeremony] = useState(null);
   const [nicknameFishIdx, setNicknameFishIdx]  = useState(null);
-  const [ceremonyNick,    setCeremonyNick]     = useState(""); // {index, nickname}
+  const [ceremonyNick,    setCeremonyNick]     = useState("");
+  const [showCbt,         setShowCbt]          = useState(false);
+  const [cbtVals,         setCbtVals]          = useState({thoughts:0,feelings:0,behaviors:0}); // {index, nickname}
   const popT     = useRef(null);
   const importRef= useRef(null);
 
@@ -1210,12 +1214,20 @@ function App(){
     else{const existing=new Set(d.rescueList);const added=DEF_RESCUE.filter(x=>!existing.has(x));if(added.length)d.rescueList=[...d.rescueList,...added];}
     if(d.rescueThreshold===undefined) d.rescueThreshold=60;
     if(!d.bigEvents)                  d.bigEvents=[];
+    if(!d.cbtLog)                     d.cbtLog={};
+    // 修正旧的 CBT 新闻 tag
+    if(d.bigEvents) d.bigEvents=d.bigEvents.map(ev=>
+      ["Thoughts","Feelings","Behaviors"].includes(ev.tag)?{...ev,tag:"cbt"}:ev
+    );
     if(!d.badges)                     d.badges=[];
     if(!d.dayColors)                  d.dayColors={};
     if(!d.daySummaries)               d.daySummaries={};
     if(!d.motto)                      d.motto="生活是一场冒险，每天都是新的探索 🌿";
     if(!d.eventTags)                  d.eventTags=["担心","开心","感恩","反思","突破","座右铭"];
     else if(!d.eventTags.includes("座右铭")) d.eventTags=[...d.eventTags,"座右铭"];
+    // 清理旧的 CBT 标签，统一为 cbt
+    d.eventTags=d.eventTags.filter(t=>!["Thoughts","Feelings","Behaviors"].includes(t));
+    if(!d.eventTags.includes("cbt")) d.eventTags=[...d.eventTags,"cbt"];
     if(!d.lastWeeklySettleDate)       d.lastWeeklySettleDate="";
     if(d.pendingWeeklyResult===undefined) d.pendingWeeklyResult=null;
     // Migrate: fishPond
@@ -1889,10 +1901,12 @@ function App(){
             daySummaries={s.daySummaries||{}}
             bigEvents={s.bigEvents||[]}
             checkedHabits={s.checkedHabits||{}}
+            cbtLog={s.cbtLog||{}}
             today={today}
             todaySnap={{date:today,long:s.longStats,short:s.shortStats,level:s.player.level}}
             onPickColor={(dateKey,color)=>save({...s,dayColors:{...(s.dayColors||{}),[dateKey]:color}})}
             onSaveSummary={(dateKey,text)=>save({...s,daySummaries:{...(s.daySummaries||{}),[dateKey]:text}})}
+            onCbt={()=>{setCbtVals({thoughts:0,feelings:0,behaviors:0});setShowCbt(true);}}
           />
 
           {/* 大事记录：今日 + 标签搜索全部历史 */}
@@ -1911,6 +1925,63 @@ function App(){
 
         <div style={{height:60}}/>
       </div>
+
+      {/* 睡前复盘弹窗 */}
+      {showCbt&&s&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setShowCbt(false)}>
+          <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px 24px",width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #D4EED4",animation:"pop .25s ease"}} onClick={e=>e.stopPropagation()}>
+            <div style={{textAlign:"center",marginBottom:22}}>
+              <div style={{fontSize:26,marginBottom:6}}>🌙</div>
+              <div style={{fontSize:18,fontWeight:900,color:"#3D2B1F"}}>今天怎么样？</div>
+            </div>
+            {[
+              {k:"thoughts", icon:"🪬", label:"Thoughts", sub:"内耗控制度"},
+              {k:"feelings", icon:"🌊", label:"Feelings",  sub:"情绪稳定度"},
+              {k:"behaviors",icon:"🚀", label:"Behaviors", sub:"启动容易度"},
+            ].map(({k,icon,label,sub})=>(
+              <div key={k} style={{marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <span style={{fontSize:18}}>{icon}</span>
+                  <div>
+                    <span style={{fontSize:12,fontWeight:800,color:"#3D2B1F"}}>{label}</span>
+                    <span style={{fontSize:11,color:"#B09070",marginLeft:6}}>· {sub}</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+                  {[1,2,3,4,5].map(n=>(
+                    <div key={n} onClick={()=>setCbtVals(p=>({...p,[k]:n}))}
+                      style={{width:32,height:32,borderRadius:"50%",cursor:"pointer",
+                        background:cbtVals[k]>=n?"#a7c957":"#E8F0E0",
+                        border:`2px solid ${cbtVals[k]>=n?"#7fa832":"#C8D8B8"}`,
+                        transition:"all .15s",
+                      }}/>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button style={{...S.cfmBtn,marginTop:6}} onClick={()=>{
+              if(!cbtVals.thoughts&&!cbtVals.feelings&&!cbtVals.behaviors) return;
+              const td=todayKey();
+              const cbtKey=td.replace(/\//g,"-");
+              // 每天只记录一次
+              if(s.cbtLog?.[cbtKey]) { setShowCbt(false); return; }
+              const newCbt={...s.cbtLog,[cbtKey]:{
+                thoughts: cbtVals.thoughts||0,
+                feelings: cbtVals.feelings||0,
+                behaviors:cbtVals.behaviors||0,
+              }};
+              const text=`内耗控制度 ${cbtVals.thoughts||"-"}  情绪稳定度 ${cbtVals.feelings||"-"}  启动容易度 ${cbtVals.behaviors||"-"}`;
+              const existingTags=s.eventTags||[];
+              const newTags=[...new Set([...existingTags,"cbt"])];
+              const ev={id:Date.now(),date:td,text,xp:1,statChanges:{},tag:"cbt"};
+              let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+              save({...s,cbtLog:newCbt,eventTags:newTags,bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+              setShowCbt(false);
+              pop("🌙 复盘完成！🌸+1");
+            }}>记录今天 🌙</button>
+          </div>
+        </div>
+      )}
 
       {/* 签到弹窗 */}
       {showMorning&&s&&(
@@ -2530,21 +2601,24 @@ function TodayEntry({today,dayColors,daySummaries,onPickColor,onSaveSummary}){
 }
 
 // ─── ColorCalendar: 颜色日历回望 ──────────────────────────
-function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,today,todaySnap,onPickColor,onSaveSummary}){
+function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,cbtLog,today,todaySnap,onPickColor,onSaveSummary,onCbt}){
   const [selected,setSelected]=useState(null); // dateKey or null
   const [open,setOpen]=useState(false);
   const [trendMode,setTrendMode]=useState(false);
 
   // All stat definitions for trend selector
   const TREND_STATS=[
-    {k:"checkins", label:"打卡", icon:"✅", color:"#a7c957", src:"checkins"},
-    {k:"mood",     label:"心情", icon:"☀️", color:"#FF9A5C", src:"short"},
-    {k:"energy",   label:"体力", icon:"⚡", color:"#7BC67E", src:"short"},
-    {k:"cognition",label:"脑力", icon:"🧠", color:"#70B8E0", src:"short"},
-    {k:"health",   label:"健康", icon:"🌿", color:"#5BAF5F", src:"long"},
-    {k:"wealth",   label:"财富", icon:"💰", color:"#E8A020", src:"long"},
-    {k:"social",   label:"友情", icon:"🤝", color:"#70B8E0", src:"long"},
-    {k:"growth",   label:"成长", icon:"📚", color:"#8B5CF6", src:"long"},
+    {k:"checkins",  label:"打卡",       icon:"✅", color:"#a7c957", src:"checkins"},
+    {k:"mood",      label:"心情",       icon:"☀️", color:"#FF9A5C", src:"short"},
+    {k:"energy",    label:"体力",       icon:"⚡", color:"#7BC67E", src:"short"},
+    {k:"cognition", label:"脑力",       icon:"🧠", color:"#70B8E0", src:"short"},
+    {k:"health",    label:"健康",       icon:"🌿", color:"#5BAF5F", src:"long"},
+    {k:"wealth",    label:"财富",       icon:"💰", color:"#E8A020", src:"long"},
+    {k:"social",    label:"友情",       icon:"🤝", color:"#70B8E0", src:"long"},
+    {k:"growth",    label:"成长",       icon:"📚", color:"#8B5CF6", src:"long"},
+    {k:"thoughts",  label:"内耗控制度", icon:"🪬", color:"#9B8EC4", src:"cbt"},
+    {k:"feelings",  label:"情绪稳定度", icon:"🌊", color:"#5BBFE0", src:"cbt"},
+    {k:"behaviors", label:"启动容易度", icon:"🚀", color:"#F0A030", src:"cbt"},
   ];
   const [trendStat,setTrendStat]=useState("checkins");
   const activeStat=TREND_STATS.find(s=>s.k===trendStat)||TREND_STATS[0];
@@ -2561,11 +2635,16 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,t
     for(let i=29;i>=0;i--){
       const d=new Date(); d.setDate(d.getDate()-i);
       const dk=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
+      // cbtLog key format: YYYY-MM-DD
+      const cbtKey=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
       const entry=byDate[dk];
       let val=null;
       if(activeStat.src==="checkins"){
         const dayChecks=checkedHabits?.[dk];
         if(dayChecks) val=Object.keys(dayChecks).length;
+      } else if(activeStat.src==="cbt"){
+        const cbtEntry=cbtLog?.[cbtKey];
+        if(cbtEntry&&cbtEntry[trendStat]!=null) val=cbtEntry[trendStat];
       } else if(entry){
         const src=activeStat.src==="long"?entry.long:entry.short;
         if(src&&src[trendStat]!=null){
@@ -2575,32 +2654,32 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,t
       days.push({dk, label:`${d.getMonth()+1}/${d.getDate()}`, val});
     }
     return days;
-  },[history,today,todaySnap,trendStat,activeStat,checkedHabits]);
+  },[history,today,todaySnap,trendStat,activeStat,checkedHabits,cbtLog]);
 
   // SVG chart dimensions
   const W=320,H=120,PL=28,PR=10,PT=10,PB=24;
   const CW=W-PL-PR, CH=H-PT-PB;
   const hasData=trendData.some(d=>d.val!==null);
 
-  // Y axis: 0-100 for stats, dynamic for checkins
+  // Y axis: cbt=1-5, checkins=dynamic, stats=0-100
+  const isCbt=activeStat.src==="cbt";
   const isCheckins=activeStat.src==="checkins";
-  const yMax=isCheckins?Math.max(5,...trendData.map(d=>d.val||0)):100;
-  const yTicks=isCheckins
-    ?[0,Math.round(yMax/2),yMax]
-    :[0,25,50,75,100];
+  const yMin=isCbt?1:0;
+  const yMax=isCbt?5:isCheckins?Math.max(5,...trendData.map(d=>d.val||0)):100;
+  const yTicks=isCbt?[1,2,3,4,5]:isCheckins?[0,Math.round(yMax/2),yMax]:[0,25,50,75,100];
 
   // Build polyline segments (break on null)
   const segments=useMemo(()=>{
     const segs=[]; let cur=[];
     trendData.forEach((d,i)=>{
       const x=PL+i*(CW/(trendData.length-1));
-      const y=d.val!==null?PT+CH-(d.val/yMax)*CH:null;
+      const y=d.val!==null?PT+CH-((d.val-yMin)/(yMax-yMin))*CH:null;
       if(y!==null){cur.push({x,y,d});}
       else if(cur.length){segs.push(cur);cur=[];}
     });
     if(cur.length)segs.push(cur);
     return segs;
-  },[trendData,yMax]);
+  },[trendData,yMin,yMax]);
 
   // X-axis labels: show ~6 evenly spaced
   const xLabels=trendData.filter((_,i)=>i===0||i===29||i%6===0);
@@ -2639,11 +2718,16 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,t
         <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🌈 彩虹收藏</div>
         <div style={{display:"flex",gap:6}}>
           <button onClick={()=>{setTrendMode(m=>!m);setSelected(null);}}
-            style={{fontSize:11,fontWeight:800,color:trendMode?"#fff":"#5BAF5F",background:trendMode?"#5BAF5F":"#F0FFF0",border:`2px solid #A8D8A8`,borderRadius:14,padding:"3px 12px",cursor:"pointer"}}>
-            {trendMode?"收藏 ◀":"趋势 📈"}
+            style={{fontSize:11,fontWeight:800,color:trendMode?"#fff":"#5BAF5F",background:trendMode?"#5BAF5F":"#F0FFF0",border:`2px solid #A8D8A8`,borderRadius:14,padding:"3px 10px",cursor:"pointer"}}>
+            {trendMode?"◀":"📈"}
           </button>
+          {!trendMode&&(()=>{
+            const cbtKey=today.replace(/\//g,"-");
+            const cbtDone=!!(cbtLog&&cbtLog[cbtKey]);
+            return <button onClick={onCbt} style={{fontSize:11,fontWeight:800,color:cbtDone?"#fff":"#5BAF5F",background:cbtDone?"#5BAF5F":"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"3px 10px",cursor:"pointer"}}>🌙</button>;
+          })()}
           {!trendMode&&<button onClick={()=>setOpen(o=>!o)} style={{fontSize:11,fontWeight:800,color:"#5BAF5F",background:"#F0FFF0",border:"2px solid #A8D8A8",borderRadius:14,padding:"3px 12px",cursor:"pointer"}}>
-            {open?"收起 ▲":"展开 ▼"}
+            {open?"▲":"▼"}
           </button>}
         </div>
       </div>
@@ -2690,7 +2774,7 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,t
               {trendData.map((d,i)=>{
                 if(d.val===null)return null;
                 const x=PL+i*(CW/(trendData.length-1));
-                const y=PT+CH-(d.val/yMax)*CH;
+                const y=PT+CH-((d.val-yMin)/(yMax-yMin))*CH;
                 return<circle key={i} cx={x} cy={y} r="3" fill={activeStat.color} stroke="#fff" strokeWidth="1.5"/>;
               })}
               {/* X轴标签 */}
