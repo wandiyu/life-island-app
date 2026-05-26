@@ -590,6 +590,7 @@ const INIT={
     lastFedDate:        "",
   },
   cbtLog: {},
+  morningStats: {},
 };
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
@@ -1218,6 +1219,7 @@ function App(){
     if(d.rescueThreshold===undefined) d.rescueThreshold=60;
     if(!d.bigEvents)                  d.bigEvents=[];
     if(!d.cbtLog)                     d.cbtLog={};
+    if(!d.morningStats)               d.morningStats={};
     // 修正旧的 CBT 新闻 tag
     if(d.bigEvents) d.bigEvents=d.bigEvents.map(ev=>
       ["Thoughts","Feelings","Behaviors"].includes(ev.tag)?{...ev,tag:"cbt"}:ev
@@ -1905,6 +1907,7 @@ function App(){
             bigEvents={s.bigEvents||[]}
             checkedHabits={s.checkedHabits||{}}
             cbtLog={s.cbtLog||{}}
+            morningStats={s.morningStats||{}}
             today={today}
             todaySnap={{date:today,long:s.longStats,short:s.shortStats,level:s.player.level}}
             onPickColor={(dateKey,color)=>save({...s,dayColors:{...(s.dayColors||{}),[dateKey]:color}})}
@@ -1985,12 +1988,7 @@ function App(){
               const newTags=[...new Set([...existingTags,"cbt"])];
               const ev={id:Date.now(),date:td,text,xp:1,statChanges:{},tag:"cbt"};
               let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
-              // 同时保存颜色和总结
-              const newDayColors=cbtColor?{...(s.dayColors||{}),[td]:cbtColor}:(s.dayColors||{});
-              const newDaySummaries=cbtSummary.trim()?{...(s.daySummaries||{}),[td]:cbtSummary.trim()}:(s.daySummaries||{});
-              save({...s,cbtLog:newCbt,eventTags:newTags,bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),
-                player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
-                dayColors:newDayColors,daySummaries:newDaySummaries});
+              save({...s,cbtLog:newCbt,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
               setShowCbt(false);
               pop("🌙 复盘完成！🌸+1");
             }}>记录今天 🌙</button>
@@ -2103,15 +2101,14 @@ function App(){
               Object.keys(morningVals).forEach(k=>{
                 if(newShort[k]) newShort[k]={...newShort[k],value:morningVals[k]};
               });
-              // 2. 生成岛上新闻
-              const ms=s.shortStats;
-              const text=`心情 ${morningVals.mood}  体力 ${morningVals.energy}  脑力 ${morningVals.cognition}`;
-              const existingTags=s.eventTags||[];
-              const newTags=existingTags.includes("签到")?existingTags:[...existingTags,"签到"];
-              const ev={id:Date.now(),date:today,text,xp:1,statChanges:{},tag:"签到"};
+              // 2. 保存签到初始值快照
+              const cbtKey2=today.replace(/\//g,"-");
+              const newMorningStats={...(s.morningStats||{}),[cbtKey2]:{
+                mood:morningVals.mood, energy:morningVals.energy, cognition:morningVals.cognition,
+              }};
               let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
               // 3. 保存
-              save({...s,shortStats:newShort,eventTags:newTags,bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+              save({...s,shortStats:newShort,morningStats:newMorningStats,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
               localStorage.setItem(morningKey,"1");
               setShowMorning(false);
               pop("🌅 签到完成！🌸+1");
@@ -2616,7 +2613,7 @@ function TodayEntry({today,dayColors,daySummaries,onPickColor,onSaveSummary}){
 }
 
 // ─── ColorCalendar: 颜色日历回望 ──────────────────────────
-function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,cbtLog,today,todaySnap,onPickColor,onSaveSummary,onCbt}){
+function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,cbtLog,morningStats,today,todaySnap,onPickColor,onSaveSummary,onCbt}){
   const [selected,setSelected]=useState(null);
   const [open,setOpen]=useState(false);
   const [trendMode,setTrendMode]=useState(false);
@@ -2641,7 +2638,7 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
   const [trendStat,setTrendStat]=useState("checkins");
   const activeStat=TREND_STATS.find(s=>s.k===trendStat)||TREND_STATS[0];
 
-  // Build last-30-days trend data
+  // Build last-30-days trend data + morning initial values
   const trendData=useMemo(()=>{
     const allEntries=[
       {date:today, long:todaySnap.long, short:todaySnap.short},
@@ -2653,10 +2650,9 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
     for(let i=29;i>=0;i--){
       const d=new Date(); d.setDate(d.getDate()-i);
       const dk=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
-      // cbtLog key format: YYYY-MM-DD
       const cbtKey=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
       const entry=byDate[dk];
-      let val=null;
+      let val=null, morningVal=null;
       if(activeStat.src==="checkins"){
         const dayChecks=checkedHabits?.[dk];
         if(dayChecks) val=Object.keys(dayChecks).length;
@@ -2668,11 +2664,15 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
         if(src&&src[trendStat]!=null){
           val=typeof src[trendStat]==="object"?src[trendStat].value:src[trendStat];
         }
+        if(activeStat.src==="short"){
+          const ms=morningStats?.[cbtKey];
+          if(ms&&ms[trendStat]!=null) morningVal=ms[trendStat];
+        }
       }
-      days.push({dk, label:`${d.getMonth()+1}/${d.getDate()}`, val});
+      days.push({dk, label:`${d.getMonth()+1}/${d.getDate()}`, val, morningVal});
     }
     return days;
-  },[history,today,todaySnap,trendStat,activeStat,checkedHabits,cbtLog]);
+  },[history,today,todaySnap,trendStat,activeStat,checkedHabits,cbtLog,morningStats]);
 
   // SVG chart dimensions
   const W=320,H=120,PL=28,PR=10,PT=10,PB=24;
@@ -2698,6 +2698,20 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
     if(cur.length)segs.push(cur);
     return segs;
   },[trendData,yMin,yMax]);
+
+  // Morning initial value segments (short stats only)
+  const morningSegments=useMemo(()=>{
+    if(activeStat.src!=="short") return [];
+    const segs=[]; let cur=[];
+    trendData.forEach((d,i)=>{
+      const x=PL+i*(CW/(trendData.length-1));
+      const y=d.morningVal!=null?PT+CH-((d.morningVal-yMin)/(yMax-yMin))*CH:null;
+      if(y!==null){cur.push({x,y});}
+      else if(cur.length){segs.push(cur);cur=[];}
+    });
+    if(cur.length)segs.push(cur);
+    return segs;
+  },[trendData,yMin,yMax,activeStat]);
 
   // X-axis labels: show ~6 evenly spaced
   const xLabels=trendData.filter((_,i)=>i===0||i===29||i%6===0);
@@ -2825,7 +2839,14 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
                   <text x={PL-4} y={y+3.5} textAnchor="end" fontSize="7" fill="#C0B090">{v}</text>
                 </g>;
               })}
-              {/* 折线段 */}
+              {/* 签到初始值折线（虚线，短期属性才显示）*/}
+              {morningSegments.map((seg,si)=>(
+                <polyline key={`m${si}`}
+                  points={seg.map(p=>`${p.x},${p.y}`).join(" ")}
+                  fill="none" stroke={activeStat.color} strokeWidth="1.5"
+                  strokeDasharray="4,3" strokeLinejoin="round" strokeLinecap="round" opacity=".5"/>
+              ))}
+              {/* 折线段（实线，最终值）*/}
               {segments.map((seg,si)=>(
                 <polyline key={si}
                   points={seg.map(p=>`${p.x},${p.y}`).join(" ")}
