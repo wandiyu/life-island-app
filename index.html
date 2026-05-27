@@ -591,6 +591,7 @@ const INIT={
   },
   cbtLog: {},
   morningStats: {},
+  checkinDates: {},
 };
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
@@ -1220,6 +1221,7 @@ function App(){
     if(!d.bigEvents)                  d.bigEvents=[];
     if(!d.cbtLog)                     d.cbtLog={};
     if(!d.morningStats)               d.morningStats={};
+    if(!d.checkinDates)               d.checkinDates={};
     // 修正旧的 CBT 新闻 tag
     if(d.bigEvents) d.bigEvents=d.bigEvents.map(ev=>
       ["Thoughts","Feelings","Behaviors"].includes(ev.tag)?{...ev,tag:"cbt"}:ev
@@ -1308,7 +1310,7 @@ function App(){
     dbSet(d);setS(d);
     // 签到检测：每天05:00后首次打开时弹出
     const morningKey=`morningCheckin_${today}`;
-    if(!localStorage.getItem(morningKey)&&h>=5){
+    if(!d.checkinDates?.[today]&&!localStorage.getItem(morningKey)&&h>=5){
       // 初始值取当前 shortStats（可能已被重置为80）
       setMorningVals({
         mood:      d.shortStats.mood?.value      ?? 80,
@@ -1783,7 +1785,7 @@ function App(){
           {/* 签到卡 */}
           {(()=>{
             const morningKey=`morningCheckin_${today}`;
-            const done=!!localStorage.getItem(morningKey);
+            const done=!!(s.checkinDates?.[today]||localStorage.getItem(morningKey));
             const nowHour=new Date().getHours();
             if(nowHour<5&&!done) return null; // 5:00前不显示
             return(
@@ -2129,9 +2131,10 @@ function App(){
               const newMorningStats={...(s.morningStats||{}),[cbtKey2]:{
                 mood:morningVals.mood, energy:morningVals.energy, cognition:morningVals.cognition,
               }};
+              const newCheckinDates={...(s.checkinDates||{}),[today]:1};
               let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
               // 3. 保存
-              save({...s,shortStats:newShort,morningStats:newMorningStats,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+              save({...s,shortStats:newShort,morningStats:newMorningStats,checkinDates:newCheckinDates,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
               localStorage.setItem(morningKey,"1");
               setShowMorning(false);
               pop("🌅 签到完成！🌸+1");
