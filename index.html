@@ -1354,7 +1354,10 @@ function App(){
     // 确保"任务"标签存在
     const existingTags=s.eventTags||[];
     const newTags=existingTags.includes("任务")?existingTags:[...existingTags,"任务"];
-    const ev={id:Date.now(),date:todayKey(),text:q.title+(q.desc?`：${q.desc}`:""),xp:r.xp||0,statChanges:{...lc,...sc},tag:"任务"};
+    const ev={id:Date.now(),date:todayKey(),text:isMain&&(q.steps||0)>0
+      ?(q.title+`，共走了 ${q.steps} 步`+(q.desc?`：${q.desc}`:""))
+      :(q.title+(q.desc?`：${q.desc}`:""))
+      ,xp:r.xp||0,statChanges:{...lc,...sc},tag:"任务"};
     save({...s,
       player:{...s.player,xp,level:lv,xpNext:xpN},
       badges:newBadges,
@@ -1713,19 +1716,39 @@ function App(){
         {/* ── 任务 ── */}
         {tab==="quests"&&<>
           {[["main","🌵 开荒主线",s.mainQuests,"🌵"],["side","🌳 种树任务",s.sideQuests,"🌳"]].map(([type,label,list,icon])=>(
-            <ACCard key={type} title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:type==="main"?20:5,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
+            <ACCard key={type} title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:5,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
               {list.filter(q=>!q.done).length===0&&<div style={S.empty}>暂无任务，去冒险吧！</div>}
               {list.filter(q=>!q.done).map(q=>(
-                <div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>{icon} {q.title}</div>
-                    {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
-                    <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
+                <div key={q.id} style={{padding:"14px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
+                  {/* 第一行：标题 + 完成/删除 */}
+                  <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>{icon} {q.title}</div>
+                      {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
+                      <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <button style={S.dBtn} onClick={()=>completeQuest(q.id)}>完成</button>
+                      <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
+                    </div>
                   </div>
-                  <div style={{display:"flex",gap:6,flexShrink:0}}>
-                    <button style={S.dBtn} onClick={()=>completeQuest(q.id)}>完成</button>
-                    <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
-                  </div>
+                  {/* 第二行：前进一步（仅主线） */}
+                  {type==="main"&&(
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginTop:10}}>
+                      <button style={{...S.plusBtn,fontSize:12,padding:"6px 14px",flex:"0 0 auto"}} onClick={()=>{
+                        const newQ={...q,steps:(q.steps||0)+1};
+                        let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+                        save({...s,
+                          mainQuests:s.mainQuests.map(x=>x.id===q.id?newQ:x),
+                          player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
+                        });
+                        pop(`🌵 前进一步！🌸+1`);
+                      }}>前进一步 🌸</button>
+                      {(q.steps||0)>0&&(
+                        <div style={{fontSize:11,color:"#a7c957",fontWeight:700}}>已走了 {q.steps} 步</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </ACCard>
