@@ -1165,6 +1165,7 @@ function App(){
   const [newFriendCeremony, setNewFriendCeremony] = useState(null);
   const [nicknameFishIdx, setNicknameFishIdx]  = useState(null);
   const [ceremonyNick,    setCeremonyNick]     = useState("");
+  const [stepCapQuest,    setStepCapQuest]     = useState(null); // quest that hit stepCap
   const [showCbt,         setShowCbt]          = useState(false);
   const [cbtVals,         setCbtVals]          = useState({thoughts:0,feelings:0,behaviors:0});
   const [cbtColor,        setCbtColor]         = useState("");
@@ -1445,7 +1446,7 @@ function App(){
     if(qForm.type==="recurring"){
       save({...s,recurringQuests:[...s.recurringQuests,{id:"r_"+Date.now(),title:qForm.title,desc:qForm.desc,period:qForm.period||"weekly",reward,lastDone:""}]});
     }else{
-      const q={id:Date.now(),title:qForm.title,desc:qForm.desc,reward,done:false};
+      const q={id:Date.now(),title:qForm.title,desc:qForm.desc,reward,done:false,...(qForm.type==="main"?{stepCap:Number(qForm.stepCap)||20,steps:0}:{})};
       save({...s,mainQuests:qForm.type==="main"?[...s.mainQuests,q]:s.mainQuests,sideQuests:qForm.type==="side"?[...s.sideQuests,q]:s.sideQuests});
     }
     setModal(null);setQForm(null);pop("📜 任务已接取");
@@ -1722,7 +1723,7 @@ function App(){
         {/* ── 任务 ── */}
         {tab==="quests"&&<>
           {[["main","🌵 开荒主线",s.mainQuests,"🌵"],["side","🌳 种树任务",s.sideQuests,"🌳"]].map(([type,label,list,icon])=>(
-            <ACCard key={type} title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:5,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
+            <ACCard key={type} title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:5,period:"weekly",long:{},short:{},stepCap:20});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
               {list.filter(q=>!q.done).length===0&&<div style={S.empty}>暂无任务，去冒险吧！</div>}
               {list.filter(q=>!q.done).map(q=>(
                 <div key={q.id} style={{padding:"14px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
@@ -1738,21 +1739,28 @@ function App(){
                       <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
                     </div>
                   </div>
-                  {/* 第二行：前进一步（仅主线） */}
                   {type==="main"&&(
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginTop:10}}>
-                      <button style={{...S.plusBtn,fontSize:12,padding:"6px 14px",flex:"0 0 auto"}} onClick={()=>{
-                        const newQ={...q,steps:(q.steps||0)+1};
+                    <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10}}>
+                      {/* 进度条 */}
+                      <div style={{flex:1}}>
+                        {(q.steps||0)>0&&<div style={{fontSize:11,color:"#a7c957",fontWeight:700,marginBottom:4}}>已走了 {q.steps} 步</div>}
+                        <div style={{height:5,background:"#E8F0D8",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,#a7c957,#7fa832)",width:`${Math.min(100,((q.steps||0)/(q.stepCap||20))*100)}%`,transition:"width .4s"}}/>
+                        </div>
+                      </div>
+                      {/* 前进一步按钮 */}
+                      <button style={{...S.plusBtn,fontSize:12,padding:"6px 14px",flexShrink:0}} onClick={()=>{
+                        const newSteps=(q.steps||0)+1;
+                        const cap=q.stepCap||20;
+                        const newQ={...q,steps:newSteps};
                         let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
                         save({...s,
                           mainQuests:s.mainQuests.map(x=>x.id===q.id?newQ:x),
                           player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
                         });
                         pop(`🌵 前进一步！🌸+1`);
+                        if(newSteps>=cap) setTimeout(()=>setStepCapQuest(newQ),300);
                       }}>前进一步 🌸</button>
-                      {(q.steps||0)>0&&(
-                        <div style={{fontSize:11,color:"#a7c957",fontWeight:700}}>已走了 {q.steps} 步</div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -2220,6 +2228,40 @@ function App(){
         );
       })()}
 
+      {/* 封顶步数弹窗 */}
+      {stepCapQuest&&s&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.6)",zIndex:190,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
+          <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px 24px",width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #C8E0A8",animation:"pop .25s ease"}}>
+            <div style={{textAlign:"center",marginBottom:20}}>
+              <div style={{fontSize:28,marginBottom:8}}>🌵</div>
+              <div style={{fontSize:17,fontWeight:900,color:"#3D2B1F"}}>抵达里程碑 {stepCapQuest.stepCap||20} 步！</div>
+              <div style={{fontSize:13,color:"#B09070",marginTop:6}}>「{stepCapQuest.title}」</div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <button style={{...S.cfmBtn}} onClick={()=>{
+                setStepCapQuest(null);
+                completeQuest(stepCapQuest.id);
+              }}>完成任务 ✅</button>
+              <button style={{padding:"12px 0",borderRadius:16,background:"#F0FFF0",color:"#5BAF5F",fontWeight:800,fontSize:14,border:"2px solid #A8D8A8",cursor:"pointer"}}
+                onClick={()=>{
+                  const season=stepCapQuest.season||1;
+                  const newSeason=season+1;
+                  const baseTitle=stepCapQuest.baseTitle||stepCapQuest.title.replace(/ S\d+$/,"");
+                  const newTitle=`${baseTitle} S${newSeason}`;
+                  const newQ={...stepCapQuest,steps:0,season:newSeason,baseTitle,title:newTitle};
+                  const cap=stepCapQuest.stepCap||20;
+                  const existingTags=s.eventTags||[];
+                  const newTags=existingTags.includes("任务")?existingTags:[...existingTags,"任务"];
+                  const ev={id:Date.now(),date:todayKey(),text:`${stepCapQuest.title}，抵达里程碑 ${cap} 步，继续探索 → S${newSeason}`,xp:0,statChanges:{},tag:"任务"};
+                  save({...s,mainQuests:s.mainQuests.map(x=>x.id===stepCapQuest.id?newQ:x),bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),eventTags:newTags});
+                  setStepCapQuest(null);
+                  pop(`🌿 继续探索！进入 S${newSeason}`);
+                }}>继续探索 🌿</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 成为朋友仪式弹窗 */}
       {newFriendCeremony&&s&&(()=>{
         const fish=FISH_LIST[newFriendCeremony.index]||FISH_LIST[0];
@@ -2341,8 +2383,19 @@ function App(){
           <input style={S.inp} placeholder="例：完成项目" value={qForm.title} onChange={e=>setQForm(p=>({...p,title:e.target.value}))}/>
           <FL>描述（可选）</FL>
           <input style={S.inp} placeholder="例：本月完成" value={qForm.desc} onChange={e=>setQForm(p=>({...p,desc:e.target.value}))}/>
-          <FL>🌸 奖励</FL>
-          <input type="number" style={{...S.inp,width:90}} value={qForm.xp} onChange={e=>setQForm(p=>({...p,xp:e.target.value}))}/>
+          {qForm.type==="main"
+            ?<div style={{display:"flex",gap:16,alignItems:"flex-end"}}>
+                <div><FL>里程碑（步数）</FL>
+                  <input type="number" min="1" style={{...S.inp,width:90}} value={qForm.stepCap??20} onChange={e=>setQForm(p=>({...p,stepCap:e.target.value===""?"":Number(e.target.value)}))}/>
+                </div>
+                <div><FL>🌸 奖励</FL>
+                  <input type="number" style={{...S.inp,width:90}} value={qForm.xp} onChange={e=>setQForm(p=>({...p,xp:e.target.value}))}/>
+                </div>
+              </div>
+            :<><FL>🌸 奖励</FL>
+              <input type="number" style={{...S.inp,width:90}} value={qForm.xp} onChange={e=>setQForm(p=>({...p,xp:e.target.value}))}/>
+            </>
+          }
           <FL>长期属性加成</FL>
           <BonusRow stats={s.longStats} bonus={qForm.long} onChange={b=>setQForm(p=>({...p,long:b}))}/>
           <FL>今日属性加成</FL>
