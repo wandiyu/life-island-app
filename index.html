@@ -2743,10 +2743,11 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
         if(src&&src[trendStat]!=null){
           val=typeof src[trendStat]==="object"?src[trendStat].value:src[trendStat];
         }
-        if(activeStat.src==="short"){
-          const ms=morningStats?.[cbtKey];
-          if(ms&&ms[trendStat]!=null) morningVal=ms[trendStat];
-        }
+      }
+      // 签到初始值独立查询（不依赖 history entry）
+      if(activeStat.src==="short"){
+        const ms=morningStats?.[cbtKey];
+        if(ms&&ms[trendStat]!=null) morningVal=ms[trendStat];
       }
       days.push({dk, label:`${d.getMonth()+1}/${d.getDate()}`, val, morningVal});
     }
