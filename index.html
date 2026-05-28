@@ -1222,6 +1222,14 @@ function App(){
     if(!d.cbtLog)                     d.cbtLog={};
     if(!d.morningStats)               d.morningStats={};
     if(!d.checkinDates)               d.checkinDates={};
+    // 迁移：把 localStorage 里的旧签到记录合并进 checkinDates
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(key&&key.startsWith("morningCheckin_")){
+        const dateStr=key.replace("morningCheckin_",""); // YYYY/MM/DD
+        if(!d.checkinDates[dateStr]) d.checkinDates[dateStr]=1;
+      }
+    }
     // 修正旧的 CBT 新闻 tag
     if(d.bigEvents) d.bigEvents=d.bigEvents.map(ev=>
       ["Thoughts","Feelings","Behaviors"].includes(ev.tag)?{...ev,tag:"cbt"}:ev
@@ -1310,14 +1318,10 @@ function App(){
     dbSet(d);setS(d);
     // 签到检测：每天05:00后首次打开时弹出
     const morningKey=`morningCheckin_${today}`;
-    if(!d.checkinDates?.[today]&&!localStorage.getItem(morningKey)&&h>=5){
+    if(!d.checkinDates?.[today]&&h>=5){
       // 初始值取当前 shortStats（可能已被重置为80）
-      setMorningVals({
-        mood:      d.shortStats.mood?.value      ?? 80,
-        energy:    d.shortStats.energy?.value    ?? 80,
-        cognition: d.shortStats.cognition?.value ?? 80,
-      });
-      setTimeout(()=>setShowMorning(true), 600);
+      setMorningVals({mood:80, energy:80, cognition:80});
+      setTimeout(()=>setShowMorning(true), 2000);
     }
     // If data came from cloud, show a brief toast (deferred so pop() is available)
     if(fromCloud){ setTimeout(()=>pop("☁️ 已从云端同步最新数据"),300); }
@@ -1785,16 +1789,12 @@ function App(){
           {/* 签到卡 */}
           {(()=>{
             const morningKey=`morningCheckin_${today}`;
-            const done=!!(s.checkinDates?.[today]||localStorage.getItem(morningKey));
+            const done=!!(s.checkinDates?.[today]);
             const nowHour=new Date().getHours();
             if(nowHour<5&&!done) return null; // 5:00前不显示
             return(
               <div onClick={done?undefined:()=>{
-                setMorningVals({
-                  mood:      s.shortStats.mood?.value      ?? 80,
-                  energy:    s.shortStats.energy?.value    ?? 80,
-                  cognition: s.shortStats.cognition?.value ?? 80,
-                });
+                setMorningVals({mood:80,energy:80,cognition:80});
                 setShowMorning(true);
               }} style={{
                 background:done?"linear-gradient(145deg,#C8F0C8,#A8E8B8)":"linear-gradient(145deg,#FFF8EC,#FFFDF5)",
