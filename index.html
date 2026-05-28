@@ -2134,8 +2134,11 @@ function App(){
               Object.keys(morningVals).forEach(k=>{
                 if(newShort[k]) newShort[k]={...newShort[k],value:morningVals[k]};
               });
-              // 2. 保存签到初始值快照
-              const cbtKey2=today.replace(/\//g,"-");
+              // 2. 保存签到初始值快照（用可靠的 YYYY-MM-DD 格式）
+              const nowD=new Date();
+              const h2=nowD.getHours();
+              if(h2<5) nowD.setDate(nowD.getDate()-1);
+              const cbtKey2=`${nowD.getFullYear()}-${String(nowD.getMonth()+1).padStart(2,"0")}-${String(nowD.getDate()).padStart(2,"0")}`;
               const newMorningStats={...(s.morningStats||{}),[cbtKey2]:{
                 mood:morningVals.mood, energy:morningVals.energy, cognition:morningVals.cognition,
               }};
@@ -2903,7 +2906,10 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
               </button>
             ))}
           </div>
-          {/* 属性名 + 颜色 */}
+          {/* 调试：morningStats keys */}
+          {activeStat.src==="short"&&<div style={{fontSize:9,color:"#B09070",marginTop:4,wordBreak:"break-all"}}>
+            签到记录：{Object.keys(morningStats||{}).slice(-3).join(", ")||"无"}
+          </div>}
           <div style={{fontSize:12,fontWeight:800,color:activeStat.color,marginBottom:10,letterSpacing:.3}}>
             {activeStat.icon} {activeStat.label} · 近30天
           </div>
