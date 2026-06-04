@@ -1168,6 +1168,7 @@ function App(){
   const [stepCapQuest,    setStepCapQuest]     = useState(null); // quest that hit stepCap
   const [showCbt,         setShowCbt]          = useState(false);
   const [cbtVals,         setCbtVals]          = useState({thoughts:0,feelings:0,behaviors:0});
+  const [cbtTargetDate,   setCbtTargetDate]    = useState(null); // null = today, else YYYY/MM/DD
   const [cbtColor,        setCbtColor]         = useState("");
   const [cbtSummary,      setCbtSummary]       = useState("");
   const [cbtPickerOpen,   setCbtPickerOpen]    = useState(false); // {index, nickname}
@@ -1251,7 +1252,7 @@ function App(){
       const old=d.fishPond||{};
       const isNew=!old.lastFedDate&&!(old.friendships||[]).length;
       const defaultFriendIdx=Math.floor(Math.random()*FISH_LIST.length);
-      const defaultFriend={index:defaultFriendIdx,nickname:"",friendDay:""};
+      const defaultFriend={index:defaultFriendIdx,nickname:"",friendDay:today};
       d.fishPond={
         currentFish:       isNew?Math.floor(Math.random()*FISH_LIST.length):(old.currentFish||0),
         friendships:       isNew?[defaultFriend]:(old.friendships||[]),
@@ -1263,7 +1264,7 @@ function App(){
       const{isHealthy,consecutiveFed,consecutiveMissed,...rest}=d.fishPond;
       if(!(rest.friendships||[]).length){
         const idx=Math.floor(Math.random()*FISH_LIST.length);
-        rest.friendships=[{index:idx,nickname:"",friendDay:""}];
+        rest.friendships=[{index:idx,nickname:"",friendDay:today}];
         setTimeout(()=>setNewFriendCeremony({index:idx,isFirst:true}),1200);
       }
       d.fishPond=rest;
@@ -1313,6 +1314,12 @@ function App(){
          pendingWeeklyResult:{gains,flowers:extraFlowers}};
     }
 
+    // 修正空的 friendDay
+    if(d.fishPond?.friendships){
+      d.fishPond={...d.fishPond,friendships:d.fishPond.friendships.map(f=>
+        f.friendDay?f:{...f,friendDay:today}
+      )};
+    }
     // Update fish missed days
     d={...d,fishPond:updateFishMissed(d.fishPond,today)};
 
@@ -1580,7 +1587,7 @@ function App(){
                 <button style={{...S.cfmBtn,marginBottom:10,background:"#4A9EC8"}} onClick={()=>{
                   const idx=Math.floor(Math.random()*FISH_LIST.length);
                   const fp=s.fishPond||{};
-                  save({...s,fishPond:{...fp,friendships:[{index:idx,nickname:"",friendDay:""}]}});
+                  save({...s,fishPond:{...fp,friendships:[{index:idx,nickname:"",friendDay:todayKey()}]}});
                   setShowSettings(false);
                   setTimeout(()=>setNewFriendCeremony({index:idx,isFirst:true}),300);
                 }}>🐟 领取初始朋友鱼</button>
@@ -1945,12 +1952,10 @@ function App(){
             todaySnap={{date:today,long:s.longStats,short:s.shortStats,level:s.player.level}}
             onPickColor={(dateKey,color)=>save({...s,dayColors:{...(s.dayColors||{}),[dateKey]:color}})}
             onSaveSummary={(dateKey,text)=>save({...s,daySummaries:{...(s.daySummaries||{}),[dateKey]:text}})}
-            onCbt={()=>{
-              const td=todayKey();
-              setCbtVals({thoughts:0,feelings:0,behaviors:0});
-              setCbtColor(s.dayColors?.[td]||"");
-              setCbtSummary(s.daySummaries?.[td]||"");
-              setCbtPickerOpen(false);
+            onCbt={()=>{setCbtVals({thoughts:0,feelings:0,behaviors:0});setCbtTargetDate(null);setShowCbt(true);}}
+            onEditCbt={(dateKey,existing)=>{
+              setCbtVals({thoughts:existing?.thoughts||0,feelings:existing?.feelings||0,behaviors:existing?.behaviors||0});
+              setCbtTargetDate(dateKey);
               setShowCbt(true);
             }}
           />
@@ -1978,7 +1983,7 @@ function App(){
           <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px 24px",width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #D4EED4",animation:"pop .25s ease"}} onClick={e=>e.stopPropagation()}>
             <div style={{textAlign:"center",marginBottom:22}}>
               <div style={{fontSize:26,marginBottom:6}}>🌙</div>
-              <div style={{fontSize:18,fontWeight:900,color:"#3D2B1F"}}>今天怎么样？</div>
+              <div style={{fontSize:18,fontWeight:900,color:"#3D2B1F"}}>{cbtTargetDate?`${cbtTargetDate.slice(5).replace("/",".")} 复盘`:"今天怎么样？"}</div>
             </div>
             {[
               {k:"thoughts", icon:"🪬", label:"Thoughts", sub:"内耗控制度"},
@@ -2007,24 +2012,39 @@ function App(){
             ))}
             <button style={{...S.cfmBtn,marginTop:6}} onClick={()=>{
               if(!cbtVals.thoughts&&!cbtVals.feelings&&!cbtVals.behaviors) return;
-              const td=todayKey();
-              const cbtKey=td.replace(/\//g,"-");
-              // 每天只记录一次
-              if(s.cbtLog?.[cbtKey]) { setShowCbt(false); return; }
+              // 支持历史日期编辑
+              const targetDate=cbtTargetDate||todayKey();
+              const nowD2=new Date();
+              const h2=nowD2.getHours();
+              if(h2<5) nowD2.setDate(nowD2.getDate()-1);
+              const cbtKey=cbtTargetDate
+                ?cbtTargetDate.replace(/\//g,"-")
+                :`${nowD2.getFullYear()}-${String(nowD2.getMonth()+1).padStart(2,"0")}-${String(nowD2.getDate()).padStart(2,"0")}`;
               const newCbt={...s.cbtLog,[cbtKey]:{
                 thoughts: cbtVals.thoughts||0,
                 feelings: cbtVals.feelings||0,
                 behaviors:cbtVals.behaviors||0,
               }};
-              const text=`内耗控制度 ${cbtVals.thoughts||"-"}  情绪稳定度 ${cbtVals.feelings||"-"}  启动容易度 ${cbtVals.behaviors||"-"}`;
+              const isHistory=!!cbtTargetDate;
               const existingTags=s.eventTags||[];
               const newTags=[...new Set([...existingTags,"cbt"])];
-              const ev={id:Date.now(),date:td,text,xp:1,statChanges:{},tag:"cbt"};
-              let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
-              save({...s,cbtLog:newCbt,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+              // 历史补记不生成新闻，今天才生成
+              let newBigEvents=s.bigEvents||[];
+              let newPlayer=s.player;
+              let newBadges=s.badges;
+              if(!isHistory){
+                const text=`内耗控制度 ${cbtVals.thoughts||"-"}  情绪稳定度 ${cbtVals.feelings||"-"}  启动容易度 ${cbtVals.behaviors||"-"}`;
+                const ev={id:Date.now(),date:targetDate,text,xp:1,statChanges:{},tag:"cbt"};
+                let{xp,lv,xpN,newBadges:nb}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+                newBigEvents=[...newBigEvents,ev].slice(-2000);
+                newPlayer={...s.player,xp,level:lv,xpNext:xpN};
+                newBadges=nb;
+              }
+              save({...s,cbtLog:newCbt,eventTags:newTags,bigEvents:newBigEvents,player:newPlayer,badges:newBadges});
               setShowCbt(false);
-              pop("🌙 复盘完成！🌸+1");
-            }}>记录今天 🌙</button>
+              setCbtTargetDate(null);
+              pop(isHistory?"🌙 已补记复盘！":"🌙 复盘完成！🌸+1");
+            }}>{cbtTargetDate?"保存复盘 🌙":"记录今天 🌙"}</button>
           </div>
         </div>
       )}
@@ -2695,7 +2715,7 @@ function TodayEntry({today,dayColors,daySummaries,onPickColor,onSaveSummary}){
 }
 
 // ─── ColorCalendar: 颜色日历回望 ──────────────────────────
-function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,cbtLog,morningStats,today,todaySnap,onPickColor,onSaveSummary,onCbt}){
+function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,cbtLog,morningStats,today,todaySnap,onPickColor,onSaveSummary,onCbt,onEditCbt}){
   const [selected,setSelected]=useState(null);
   const [open,setOpen]=useState(false);
   const [trendMode,setTrendMode]=useState(false);
@@ -3003,6 +3023,24 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
               onPickColor={color=>onPickColor(selected,color)}
               onSaveSummary={text=>onSaveSummary(selected,text)}
             />
+            {/* CBT 编辑入口 */}
+            {(()=>{
+              const cbtKey=selected.replace(/\//g,"-");
+              const existing=cbtLog?.[cbtKey];
+              return(
+                <button onClick={()=>onEditCbt&&onEditCbt(selected,existing)}
+                  style={{width:"100%",marginTop:8,padding:"8px 0",borderRadius:12,
+                    background:existing?"#F0FFF0":"#FFFDF5",
+                    border:`1.5px dashed ${existing?"#A8D8A8":"#EDD9A3"}`,
+                    color:existing?"#5BAF5F":"#B09070",
+                    fontSize:12,fontWeight:700,cursor:"pointer",
+                  }}>
+                  {existing
+                    ?`🌙 已复盘 · 内耗 ${existing.thoughts} · 情绪 ${existing.feelings} · 启动 ${existing.behaviors}`
+                    :"🌙 补记这一天的复盘"}
+                </button>
+              );
+            })()}
             {/* that day's big events */}
             {selectedEvents.length>0&&(
               <div style={{marginTop:4}}>
