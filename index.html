@@ -2979,7 +2979,12 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
       {/* ── 收藏视图 ── */}
       {!trendMode&&<>
         {/* calendar grid */}
-        {byMonth.slice(0,open?byMonth.length:1).map(({mk,days})=>(
+        {byMonth.slice(0,open?byMonth.length:1).map(({mk,days})=>{
+          const monthSelected=selected&&days.find(d=>d.date===selected);
+          const selDay=monthSelected?allDays.find(d=>d.date===selected):null;
+          const selBg=monthSelected?dayColors[selected]||null:null;
+          const selEvents=(bigEvents||[]).filter(ev=>ev.date===selected);
+          return(
           <div key={mk} style={{marginBottom:14}}>
             <div style={{fontSize:10,color:"#B09070",fontWeight:800,marginBottom:8,letterSpacing:1}}>{mk.replace("/","年").replace("/","月")} 月</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
@@ -3009,51 +3014,51 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
                 );
               })}
             </div>
-          </div>
-        ))}
-
-        {/* selected day detail */}
-        {selected&&selectedDay&&(
-          <div style={{marginTop:12,borderTop:"2px dashed #EDD9A3",paddingTop:14,animation:"fadeSlideUp .25s ease"}}>
-            <DayEntry
-              h={selectedDay}
-              isToday={selectedDay.isToday}
-              bg={selectedBg}
-              summary={daySummaries[selected]||""}
-              onPickColor={color=>onPickColor(selected,color)}
-              onSaveSummary={text=>onSaveSummary(selected,text)}
-            />
-            {/* CBT 编辑入口 */}
-            {(()=>{
-              const cbtKey=selected.replace(/\//g,"-");
-              const existing=cbtLog?.[cbtKey];
-              return(
-                <button onClick={()=>onEditCbt&&onEditCbt(selected,existing)}
-                  style={{width:"100%",marginTop:8,padding:"8px 0",borderRadius:12,
-                    background:existing?"#F0FFF0":"#FFFDF5",
-                    border:`1.5px dashed ${existing?"#A8D8A8":"#EDD9A3"}`,
-                    color:existing?"#5BAF5F":"#B09070",
-                    fontSize:12,fontWeight:700,cursor:"pointer",
-                  }}>
-                  {existing
-                    ?`🌙 已复盘 · 内耗 ${existing.thoughts} · 情绪 ${existing.feelings} · 启动 ${existing.behaviors}`
-                    :"🌙 补记这一天的复盘"}
-                </button>
-              );
-            })()}
-            {/* that day's big events */}
-            {selectedEvents.length>0&&(
-              <div style={{marginTop:4}}>
-                {selectedEvents.map(ev=>(
-                  <div key={ev.id} style={{padding:"8px 10px",borderRadius:12,background:"#FAFFF8",border:"1.5px dashed #C8E8C8",marginBottom:6,fontSize:13,color:"#3D2B1F",lineHeight:1.6}}>
-                    {ev.tag&&<span style={{fontSize:10,fontWeight:800,color:"#5BAF5F",marginRight:6}}>#{ev.tag}</span>}
-                    {ev.text}
+            {/* selected day detail — 在本月方块下方展开 */}
+            {monthSelected&&selDay&&(
+              <div style={{marginTop:12,borderTop:"2px dashed #EDD9A3",paddingTop:14,animation:"fadeSlideUp .25s ease"}}>
+                <DayEntry
+                  h={selDay}
+                  isToday={selDay.isToday}
+                  bg={selBg}
+                  summary={daySummaries[selected]||""}
+                  onPickColor={color=>onPickColor(selected,color)}
+                  onSaveSummary={text=>onSaveSummary(selected,text)}
+                />
+                {/* CBT 编辑入口 */}
+                {(()=>{
+                  const cbtKey=selected.replace(/\//g,"-");
+                  const existing=cbtLog?.[cbtKey];
+                  return(
+                    <button onClick={()=>onEditCbt&&onEditCbt(selected,existing)}
+                      style={{width:"100%",marginTop:8,padding:"8px 0",borderRadius:12,
+                        background:existing?"#F0FFF0":"#FFFDF5",
+                        border:`1.5px dashed ${existing?"#A8D8A8":"#EDD9A3"}`,
+                        color:existing?"#5BAF5F":"#B09070",
+                        fontSize:12,fontWeight:700,cursor:"pointer",
+                      }}>
+                      {existing
+                        ?`🌙 已复盘 · 内耗 ${existing.thoughts} · 情绪 ${existing.feelings} · 启动 ${existing.behaviors}`
+                        :"🌙 补记这一天的复盘"}
+                    </button>
+                  );
+                })()}
+                {/* that day's big events */}
+                {selEvents.length>0&&(
+                  <div style={{marginTop:4}}>
+                    {selEvents.map(ev=>(
+                      <div key={ev.id} style={{padding:"8px 10px",borderRadius:12,background:"#FAFFF8",border:"1.5px dashed #C8E8C8",marginBottom:6,fontSize:13,color:"#3D2B1F",lineHeight:1.6}}>
+                        {ev.tag&&<span style={{fontSize:10,fontWeight:800,color:"#5BAF5F",marginRight:6}}>#{ev.tag}</span>}
+                        {ev.text}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
-        )}
+          );
+        })}
       </>}
     </div>
   );
