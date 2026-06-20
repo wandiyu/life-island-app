@@ -1323,8 +1323,8 @@ function App(){
     if(!d.motto)                      d.motto="生活是一场冒险，每天都是新的探索 🌿";
     if(!d.eventTags)                  d.eventTags=["担心","开心","感恩","反思","突破","座右铭"];
     else if(!d.eventTags.includes("座右铭")) d.eventTags=[...d.eventTags,"座右铭"];
-    // 清理 CBT 相关标签（cbt 已不再生成岛上新闻）
-    d.eventTags=d.eventTags.filter(t=>!["Thoughts","Feelings","Behaviors","cbt"].includes(t));
+    // 清理旧的 CBT 标签名（Thoughts/Feelings/Behaviors 已废弃，cbt 由用户自行决定是否保留）
+    d.eventTags=d.eventTags.filter(t=>!["Thoughts","Feelings","Behaviors"].includes(t));
     if(!d.lastWeeklySettleDate)       d.lastWeeklySettleDate="";
     if(d.pendingWeeklyResult===undefined) d.pendingWeeklyResult=null;
     // Migrate: fishPond
