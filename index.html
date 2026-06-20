@@ -1086,8 +1086,15 @@ function CollapsibleRescueSection({s,save,pop}){
 function TagManageSection({s,save,pop}){
   const [open,setOpen]=useState(false);
   const [newTag,setNewTag]=useState("");
-  const tags=s.eventTags||[];
-  const FUNC=["任务","签到","座右铭","抽签"]; // 功能性标签不可删除/排序
+  const FUNC=["任务","签到","座右铭","抽签"]; // 功能性标签不可删除，但可排序
+
+  // 系统标签始终排在最前面（按 FUNC 内部顺序），其余标签保持用户排序
+  const tags=useMemo(()=>{
+    const raw=s.eventTags||[];
+    const sysInOrder=raw.filter(t=>FUNC.includes(t));
+    const others=raw.filter(t=>!FUNC.includes(t));
+    return[...sysInOrder,...others];
+  },[s.eventTags]);
 
   const move=(i,dir)=>{
     const j=i+dir;
@@ -1115,7 +1122,7 @@ function TagManageSection({s,save,pop}){
         <span style={{fontSize:12,color:"#B09070",fontWeight:700}}>{open?"收起 ▲":"展开 ▼"}</span>
       </div>
       {open&&<div style={{marginTop:10}}>
-        <div style={{fontSize:11,color:"#B09070",marginBottom:10}}>功能性标签（任务/签到/座右铭/抽签）不可删除或排序</div>
+        <div style={{fontSize:11,color:"#B09070",marginBottom:10}}>功能性标签（任务/签到/座右铭/抽签）默认置顶，不可删除，但可调整顺序</div>
         {tags.map((tag,i)=>{
           const isFunc=FUNC.includes(tag);
           return(
@@ -1126,12 +1133,10 @@ function TagManageSection({s,save,pop}){
                 :<div style={{width:34,flexShrink:0}}/>
               }
               <span style={{flex:1,fontSize:13,fontWeight:isFunc?800:600,color:isFunc?"#B09070":"#3D2B1F"}}>{tag}{isFunc&&<span style={{fontSize:10,color:"#C8A880",marginLeft:6}}>（系统）</span>}</span>
-              {!isFunc&&<>
-                <button disabled={i===0} onClick={()=>move(i,-1)}
-                  style={{width:26,height:26,borderRadius:8,border:"2px solid #D4EED4",background:i===0?"#F5F5F0":"#F0FFF0",color:i===0?"#C8C8C0":"#5BAF5F",fontSize:11,cursor:i===0?"default":"pointer",flexShrink:0}}>▲</button>
-                <button disabled={i===tags.length-1} onClick={()=>move(i,1)}
-                  style={{width:26,height:26,borderRadius:8,border:"2px solid #D4EED4",background:i===tags.length-1?"#F5F5F0":"#F0FFF0",color:i===tags.length-1?"#C8C8C0":"#5BAF5F",fontSize:11,cursor:i===tags.length-1?"default":"pointer",flexShrink:0}}>▼</button>
-              </>}
+              <button disabled={i===0} onClick={()=>move(i,-1)}
+                style={{width:26,height:26,borderRadius:8,border:"2px solid #D4EED4",background:i===0?"#F5F5F0":"#F0FFF0",color:i===0?"#C8C8C0":"#5BAF5F",fontSize:11,cursor:i===0?"default":"pointer",flexShrink:0}}>▲</button>
+              <button disabled={i===tags.length-1} onClick={()=>move(i,1)}
+                style={{width:26,height:26,borderRadius:8,border:"2px solid #D4EED4",background:i===tags.length-1?"#F5F5F0":"#F0FFF0",color:i===tags.length-1?"#C8C8C0":"#5BAF5F",fontSize:11,cursor:i===tags.length-1?"default":"pointer",flexShrink:0}}>▼</button>
             </div>
           );
         })}
@@ -3258,14 +3263,12 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
           );
         })()}
         {/* tag pills */}
-        {[...eventTags].sort((a,b)=>{
+        {(()=>{
           const FUNC=["任务","签到","座右铭","抽签"];
-          const ai=FUNC.indexOf(a),bi=FUNC.indexOf(b);
-          if(ai!==-1&&bi!==-1)return ai-bi;
-          if(ai!==-1)return -1;
-          if(bi!==-1)return 1;
-          return 0;
-        }).map(tag=>{
+          const sysInOrder=eventTags.filter(t=>FUNC.includes(t));
+          const others=eventTags.filter(t=>!FUNC.includes(t));
+          return[...sysInOrder,...others];
+        })().map(tag=>{
           const tc=getTagColor(tag,eventTags);
           const count=events.filter(ev=>ev.tag===tag).length;
           const active=activeTag===tag;
