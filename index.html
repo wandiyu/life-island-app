@@ -1323,9 +1323,8 @@ function App(){
     if(!d.motto)                      d.motto="生活是一场冒险，每天都是新的探索 🌿";
     if(!d.eventTags)                  d.eventTags=["担心","开心","感恩","反思","突破","座右铭"];
     else if(!d.eventTags.includes("座右铭")) d.eventTags=[...d.eventTags,"座右铭"];
-    // 清理旧的 CBT 标签，统一为 cbt
-    d.eventTags=d.eventTags.filter(t=>!["Thoughts","Feelings","Behaviors"].includes(t));
-    if(!d.eventTags.includes("cbt")) d.eventTags=[...d.eventTags,"cbt"];
+    // 清理 CBT 相关标签（cbt 已不再生成岛上新闻）
+    d.eventTags=d.eventTags.filter(t=>!["Thoughts","Feelings","Behaviors","cbt"].includes(t));
     if(!d.lastWeeklySettleDate)       d.lastWeeklySettleDate="";
     if(d.pendingWeeklyResult===undefined) d.pendingWeeklyResult=null;
     // Migrate: fishPond
@@ -2109,24 +2108,11 @@ function App(){
                 behaviors:cbtVals.behaviors||0,
               }};
               const isHistory=!!cbtTargetDate;
-              const existingTags=s.eventTags||[];
-              const newTags=[...new Set([...existingTags,"cbt"])];
-              // 历史补记不生成新闻，今天才生成
-              let newBigEvents=s.bigEvents||[];
-              let newPlayer=s.player;
-              let newBadges=s.badges;
-              if(!isHistory){
-                const text=`内耗控制度 ${cbtVals.thoughts||"-"}  情绪稳定度 ${cbtVals.feelings||"-"}  启动容易度 ${cbtVals.behaviors||"-"}`;
-                const ev={id:Date.now(),date:targetDate,text,xp:1,statChanges:{},tag:"cbt"};
-                let{xp,lv,xpN,newBadges:nb}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
-                newBigEvents=[...newBigEvents,ev].slice(-2000);
-                newPlayer={...s.player,xp,level:lv,xpNext:xpN};
-                newBadges=nb;
-              }
-              save({...s,cbtLog:newCbt,eventTags:newTags,bigEvents:newBigEvents,player:newPlayer,badges:newBadges});
+              // CBT 只存数据，不生成岛上新闻、不加 xp
+              save({...s,cbtLog:newCbt});
               setShowCbt(false);
               setCbtTargetDate(null);
-              pop(isHistory?"🌙 已补记复盘！":"🌙 复盘完成！🌸+1");
+              pop(isHistory?"🌙 已补记复盘！":"🌙 复盘完成！");
             }}>{cbtTargetDate?"保存复盘 🌙":"记录今天 🌙"}</button>
           </div>
         </div>
@@ -3228,7 +3214,7 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
   const filtered=
     activeTag==="today"?todayEvents:
     activeTag==="all"?[...events].reverse():
-    activeTag==="none"?[...events].reverse().filter(ev=>!ev.tag):
+    activeTag==="none"?[...events].reverse().filter(ev=>!ev.tag||!eventTags.includes(ev.tag)):
     [...events].reverse().filter(ev=>ev.tag===activeTag);
 
   const submitNewTag=()=>{
@@ -3262,7 +3248,7 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
         </button>
         {/* 无标签 tab */}
         {(()=>{
-          const noTagCount=events.filter(ev=>!ev.tag).length;
+          const noTagCount=events.filter(ev=>!ev.tag||!eventTags.includes(ev.tag)).length;
           if(noTagCount===0) return null;
           return(
             <button onClick={()=>setActiveTag("none")}
@@ -3284,14 +3270,10 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
           const count=events.filter(ev=>ev.tag===tag).length;
           const active=activeTag===tag;
           return(
-            <div key={tag} style={{display:"flex",alignItems:"center"}}>
-              <button onClick={()=>setActiveTag(active?"today":tag)}
-                style={{fontSize:11,fontWeight:active?900:600,borderRadius:"18px 0 0 18px",padding:"4px 10px",border:`2px solid ${tc.border}`,borderRight:"none",background:active?tc.border:tc.bg,color:tc.text,cursor:"pointer"}}>
-                {tag}{count>0&&<span style={{opacity:.7}}> {count}</span>}
-              </button>
-              <button onClick={()=>{if(activeTag===tag)setActiveTag("today");onDeleteTag(tag);}}
-                style={{fontSize:10,borderRadius:"0 18px 18px 0",padding:"4px 7px",border:`2px solid ${tc.border}`,borderLeft:"1px solid rgba(0,0,0,.1)",background:active?tc.border:tc.bg,color:tc.text,cursor:"pointer",opacity:.6}}>✕</button>
-            </div>
+            <button key={tag} onClick={()=>setActiveTag(active?"today":tag)}
+              style={{fontSize:11,fontWeight:active?900:600,borderRadius:18,padding:"4px 12px",border:`2px solid ${tc.border}`,background:active?tc.border:tc.bg,color:tc.text,cursor:"pointer"}}>
+              {tag}{count>0&&<span style={{opacity:.7}}> {count}</span>}
+            </button>
           );
         })}
         {addingTag
