@@ -1719,6 +1719,20 @@ function App(){
 
         {/* ── 主页 ── */}
         {tab==="home"&&<>
+          {/* 快速电梯 */}
+          <div style={{display:"flex",gap:2,position:"sticky",top:58,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+            {[["h-long","🍊"],["h-short","🌤️"],["h-motto","🔮"]].map(([id,label])=>(
+              <button key={id} onClick={()=>{
+                  const el=document.getElementById(id);
+                  if(!el)return;
+                  const y=el.getBoundingClientRect().top+window.scrollY-105;
+                  window.scrollTo({top:y,behavior:"smooth"});
+                }}
+                style={{flex:1,fontSize:17,fontWeight:700,color:"#5BAF5F",background:"none",border:"none",borderRadius:10,padding:"3px 4px",cursor:"pointer"}}>
+                {label}
+              </button>
+            ))}
+          </div>
           {showAlert&&(
             <div style={{background:"linear-gradient(135deg,#FFF8DC,#FFF3C4)",border:"2.5px solid #FFD166",borderRadius:20,padding:"14px 16px",marginBottom:12,boxShadow:"0 4px 16px rgba(255,209,102,.3)"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1729,6 +1743,7 @@ function App(){
             </div>
           )}
           {/* long stats */}
+          <div id="h-long">
           <ACCard title="🍊 岛屿物产">
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {Object.entries(s.longStats).map(([k,st])=>(
@@ -1754,7 +1769,9 @@ function App(){
             </div>
 
           </ACCard>
+          </div>
           {/* short stats */}
+          <div id="h-short">
           <ACCard title="🌤️ 今日天气">
             <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
               {Object.entries(s.shortStats).map(([k,st])=>{
@@ -1788,8 +1805,10 @@ function App(){
             </div>
 
           </ACCard>
+          </div>
           
           {/* motto */}
+          <div id="h-motto">
           <ACCard title={t("🔮 岛主座右铭","🔮 Motto")} action={
             <button style={S.editTxtBtn} onClick={()=>{setMottoD(s.motto||"");setEditingMotto(true);}}>{t("编辑","Edit")}</button>
           }>
@@ -1812,12 +1831,26 @@ function App(){
               :<div style={{fontSize:15,color:"#3D2B1F",lineHeight:1.75,fontWeight:700,background:"#F8FFF8",borderRadius:14,padding:"12px 16px",border:"2px dashed #C8E8C8",fontStyle:"italic"}}>{s.motto||t("点击「编辑」添加岛主座右铭 🔮","Click Edit to add your motto 🌿")}</div>
             }
           </ACCard>
+          </div>
         </>}
-
-        {/* ── 任务 ── */}
         {tab==="quests"&&<>
+          {/* 快速电梯 */}
+          <div style={{display:"flex",gap:2,position:"sticky",top:58,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+            {[["q-main","🌵"],["q-side","🌳"],["q-recurring","💦"]].map(([id,label])=>(
+              <button key={id} onClick={()=>{
+                  const el=document.getElementById(id);
+                  if(!el)return;
+                  const y=el.getBoundingClientRect().top+window.scrollY-105;
+                  window.scrollTo({top:y,behavior:"smooth"});
+                }}
+                style={{flex:1,fontSize:17,fontWeight:700,color:"#5BAF5F",background:"none",border:"none",borderRadius:10,padding:"3px 4px",cursor:"pointer"}}>
+                {label}
+              </button>
+            ))}
+          </div>
           {[["main","🌵 开荒主线",s.mainQuests,"🌵"],["side","🌳 种树任务",s.sideQuests,"🌳"]].map(([type,label,list,icon])=>(
-            <ACCard key={type} title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:5,period:"weekly",long:{},short:{},stepCap:20});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
+            <div key={type} id={`q-${type}`}>
+            <ACCard title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:5,period:"weekly",long:{},short:{},stepCap:20});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
               {list.filter(q=>!q.done).length===0&&<div style={S.empty}>暂无任务，去冒险吧！</div>}
               {list.filter(q=>!q.done).map(q=>(
                 <div key={q.id} style={{padding:"14px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
@@ -1860,7 +1893,9 @@ function App(){
                 </div>
               ))}
             </ACCard>
+            </div>
           ))}
+          <div id="q-recurring">
           <ACCard title={t("💦 浇水任务","💦 Recurring")} action={<button style={S.plusBtn} onClick={()=>{setQForm({type:"recurring",title:"",desc:"",xp:5,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
             {s.recurringQuests.length===0&&<div style={S.empty}>添加每周/每月浇水任务吧 💦</div>}
             {s.recurringQuests.map(q=>{
@@ -1883,11 +1918,26 @@ function App(){
               </div>;
             })}
           </ACCard>
+          </div>
         </>}
 
         {/* ── 打卡 ── */}
         {tab==="habits"&&(
           <>
+          {/* 快速电梯 */}
+          <div style={{display:"flex",gap:2,position:"sticky",top:58,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+            {[["hb-today","🐠"],["hb-week","🐙"]].map(([id,label])=>(
+              <button key={id} onClick={()=>{
+                  const el=document.getElementById(id);
+                  if(!el)return;
+                  const y=el.getBoundingClientRect().top+window.scrollY-105;
+                  window.scrollTo({top:y,behavior:"smooth"});
+                }}
+                style={{flex:1,fontSize:17,fontWeight:700,color:"#5BAF5F",background:"none",border:"none",borderRadius:10,padding:"3px 4px",cursor:"pointer"}}>
+                {label}
+              </button>
+            ))}
+          </div>
           {/* 签到卡 */}
           {(()=>{
             const morningKey=`morningCheckin_${today}`;
@@ -1921,6 +1971,7 @@ function App(){
           })()}
 
           {/* 今日打卡 FIRST */}
+          <div id="hb-today">
           <ACCard title={t("🐠 今日打卡","🌻 Today")} action={<button style={S.plusBtn} onClick={()=>{setHabEdit({id:"",label:"",icon:"⭐",weeklyBonus:{stats:[]},weeklyTarget:5,shortBonus:{}});setModal("habit");}}>{t("＋ 新增","＋ Add")}</button>}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
               {s.habits.map(h=>{
@@ -1939,9 +1990,10 @@ function App(){
               })}
             </div>
           </ACCard>
+          </div>
 
           {/* 本周进度 SECOND */}
-          <div style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
+          <div id="hb-week" style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>🐙 本周进度</div>
             </div>
@@ -1972,7 +2024,22 @@ function App(){
 
         {/* ── 记录 ── */}
         {tab==="log"&&<>
+          {/* 快速电梯 */}
+          <div style={{display:"flex",gap:2,position:"sticky",top:58,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+            {[["l-fish","🐋"],["l-rainbow","🌈"],["l-news","📰"]].map(([id,label])=>(
+              <button key={id} onClick={()=>{
+                  const el=document.getElementById(id);
+                  if(!el)return;
+                  const y=el.getBoundingClientRect().top+window.scrollY-105;
+                  window.scrollTo({top:y,behavior:"smooth"});
+                }}
+                style={{flex:1,fontSize:17,fontWeight:700,color:"#5BAF5F",background:"none",border:"none",borderRadius:10,padding:"3px 4px",cursor:"pointer"}}>
+                {label}
+              </button>
+            ))}
+          </div>
           {/* 🐠 鱼池 */}
+          <div id="l-fish">
           {(()=>{
             const fp={currentFish:0,friendships:[],currentFriendship:0,...(s.fishPond||{})};
             const curFish=FISH_LIST[fp.currentFish]||FISH_LIST[0];
@@ -2025,8 +2092,10 @@ function App(){
               </ACCard>
             );
           })()}
+          </div>
 
           {/* 🌈 色彩日记 */}
+          <div id="l-rainbow">
           <ColorCalendar
             history={s.history}
             dayColors={s.dayColors||{}}
@@ -2046,8 +2115,10 @@ function App(){
               setShowCbt(true);
             }}
           />
+          </div>
 
           {/* 大事记录：今日 + 标签搜索全部历史 */}
+          <div id="l-news">
           <BigEventsCard
             events={s.bigEvents}
             eventTags={s.eventTags||[]}
@@ -2059,6 +2130,7 @@ function App(){
             onDeleteTag={tag=>save({...s,eventTags:(s.eventTags||[]).filter(t=>t!==tag)})}
             onAddTag={tag=>{if(tag&&!(s.eventTags||[]).includes(tag))save({...s,eventTags:[...(s.eventTags||[]),tag]});}}
           />
+          </div>
         </>}
 
         <div style={{height:60}}/>
