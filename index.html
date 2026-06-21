@@ -1880,12 +1880,13 @@ function App(){
                         const newSteps=(q.steps||0)+1;
                         const cap=q.stepCap||20;
                         const newQ={...q,steps:newSteps};
-                        let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+                        let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
                         save({...s,
                           mainQuests:s.mainQuests.map(x=>x.id===q.id?newQ:x),
                           player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
                         });
-                        pop(`🌵 前进一步！🌸+1`);
+                        if(s.player.level!==lv){setNewBadge(latestBadge);}
+                        else pop(`🌵 前进一步！🌸+1`);
                         if(newSteps>=cap) setTimeout(()=>setStepCapQuest(newQ),300);
                       }}>前进一步 🌸</button>
                     </div>
@@ -2125,7 +2126,7 @@ function App(){
             longStats={s.longStats}
             shortStats={s.shortStats}
             today={today}
-            onAdd={()=>{setEvForm({text:"",xp:1,changes:{},tag:""});setModal("bigEvent");}}
+            onAdd={(presetTag)=>{setEvForm({text:"",xp:1,changes:{},tag:presetTag||""});setModal("bigEvent");}}
             onEdit={(ev)=>{setEvForm({id:ev.id,text:ev.text,xp:ev.xp||0,changes:ev.statChanges||{},tag:ev.tag||""});setModal("bigEvent");}}
             onDeleteTag={tag=>save({...s,eventTags:(s.eventTags||[]).filter(t=>t!==tag)})}
             onAddTag={tag=>{if(tag&&!(s.eventTags||[]).includes(tag))save({...s,eventTags:[...(s.eventTags||[]),tag]});}}
@@ -2277,10 +2278,11 @@ function App(){
                           onClick={()=>{
                             const tf=todayKey();
                             const {newFp,becameFriend}=doFeedFish(s.fishPond||{},tf);
-                            let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+                            let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
                             save({...s,fishPond:newFp,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
                             const line=FEED_LINES[Math.floor(Math.random()*FEED_LINES.length)];
-                            pop(`${FISH_LIST[fp.currentFish||0].emoji} ${line} 🌸+1`);
+                            if(s.player.level!==lv){setNewBadge(latestBadge);}
+                            else pop(`${FISH_LIST[fp.currentFish||0].emoji} ${line} 🌸+1`);
                             if(becameFriend) setTimeout(()=>setNewFriendCeremony({index:fp.currentFish||0,isFirst:false}),600);
                           }}>
                           🐟 喂鱼 · 🌸+1
@@ -2309,12 +2311,13 @@ function App(){
                 mood:morningVals.mood, energy:morningVals.energy, cognition:morningVals.cognition,
               }};
               const newCheckinDates={...(s.checkinDates||{}),[today]:1};
-              let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+              let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
               // 3. 保存
               save({...s,shortStats:newShort,morningStats:newMorningStats,checkinDates:newCheckinDates,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
               localStorage.setItem(morningKey,"1");
               setShowMorning(false);
-              pop("🌅 签到完成！🌸+1");
+              if(s.player.level!==lv){setNewBadge(latestBadge);}
+              else pop("🌅 签到完成！🌸+1");
             }}>开始今天 🌿</button>
           </div>
         </div>
@@ -2589,10 +2592,11 @@ function App(){
                   const existingTags=s.eventTags||[];
                   const newTags=existingTags.includes("抽签")?existingTags:[...existingTags,"抽签"];
                   const ev={id:Date.now(),date:todayKey(),text,xp:1,statChanges:{},tag:"抽签"};
-                  let{xp,lv,xpN,newBadges}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+                  let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
                   save({...s,bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),eventTags:newTags,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
                   setModal(null);setDrawCounting(null);setDrawResult(null);
                   setDrawQuestion("");setDrawOpt1("是");setDrawOpt2("否");
+                  if(s.player.level!==lv){setTimeout(()=>setNewBadge(latestBadge),300);}
                 }}>去做！🌸+1</button>
               </div>
             )}
@@ -3308,7 +3312,7 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
       {/* header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
         <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5}}>📰 岛上新闻</div>
-        <button style={S.plusBtn} onClick={onAdd}>{t("＋ 记录","＋ Add")}</button>
+        <button style={S.plusBtn} onClick={()=>onAdd(["today","all","none"].includes(activeTag)?"":activeTag)}>{t("＋ 记录","＋ Add")}</button>
       </div>
 
       {/* tag filter */}
