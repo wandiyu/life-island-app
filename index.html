@@ -793,7 +793,7 @@ const Leaf=({x,y,r=0,s=1,c="#7BC67E"})=>(
 );
 
 // AC-style header cloud/hill SVG
-function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift,onBadge,onDraw}){
+function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift,onBadge,onDraw,shortStats,onStatChange}){
   const t=useT();
   const hour=new Date().getHours();
 
@@ -958,18 +958,43 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
           </div>
         </div>
 
+        {/* 今日天气 mini strip */}
+        {shortStats&&(
+          <div style={{display:"flex",gap:6,marginBottom:10}}>
+            {Object.entries(shortStats).map(([k,st])=>(
+              <div key={k} style={{
+                flex:1,display:"flex",flexDirection:"column",
+                background:"rgba(255,255,255,.4)",border:"1.5px solid rgba(255,255,255,.55)",
+                borderRadius:14,overflow:"hidden",backdropFilter:"blur(4px)",
+              }}>
+                <div onClick={()=>onStatChange&&onStatChange(k,10)}
+                  style={{display:"flex",alignItems:"center",gap:6,justifyContent:"center",padding:"7px 6px 3px",cursor:"pointer"}}>
+                  <span style={{fontSize:16}}>{st.icon}</span>
+                  <span style={{fontSize:17,fontWeight:900,color:"#fff",textShadow:"0 1px 4px rgba(0,0,0,.2)"}}>{st.value}</span>
+                </div>
+                <div onClick={()=>onStatChange&&onStatChange(k,-10)}
+                  style={{height:5,cursor:"pointer",padding:"0 6px 4px"}}>
+                  <div style={{height:3,background:"rgba(255,255,255,.25)",borderRadius:2,overflow:"hidden"}}>
+                    <div style={{height:"100%",background:"rgba(255,255,255,.85)",borderRadius:2,width:`${st.value}%`}}/>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* habit pills */}
-        <div style={{display:"flex",gap:6,alignItems:"center",paddingBottom:18,flexWrap:"wrap",marginTop:4}}>
+        <div style={{display:"flex",gap:5,alignItems:"center",paddingBottom:18,flexWrap:"wrap",marginTop:4}}>
           {habits.map(h=>{
             const done=!!th[h.id];
             return(
               <div key={h.id} title={h.label} style={{
-                width:32,height:32,borderRadius:"50%",
+                width:30,height:30,borderRadius:"50%",
                 background:done?"rgba(255,255,255,.9)":"rgba(255,255,255,.3)",
-                border:`2px solid ${done?"rgba(255,255,255,.95)":"rgba(255,255,255,.4)"}`,
+                border:`1.5px solid ${done?"rgba(255,255,255,.95)":"rgba(255,255,255,.4)"}`,
                 display:"flex",alignItems:"center",justifyContent:"center",
-                fontSize:15,transition:"all .25s",
-                boxShadow:done?"0 2px 8px rgba(0,0,0,.15)":"none",
+                fontSize:14,transition:"all .25s",
+                boxShadow:done?"0 2px 6px rgba(0,0,0,.15)":"none",
               }}>{h.icon}</div>
             );
           })}
@@ -1702,6 +1727,8 @@ function App(){
         onGift={()=>setModal("rescue")}
         onDraw={()=>setModal("draw")}
         onBadge={()=>setModal("badges")}
+        shortStats={s.shortStats}
+        onStatChange={(k,delta)=>{setEvForm({text:"",xp:1,changes:{[k]:delta}});setModal("bigEvent");}}
       />
 
       {/* tab bar */}
