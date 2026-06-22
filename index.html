@@ -592,6 +592,7 @@ const INIT={
   cbtLog: {},
   morningStats: {},
   checkinDates: {},
+  collectionTasks: [],
 };
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
@@ -1272,6 +1273,7 @@ function App(){
   const [nicknameFishIdx, setNicknameFishIdx]  = useState(null);
   const [ceremonyNick,    setCeremonyNick]     = useState("");
   const [stepCapQuest,    setStepCapQuest]     = useState(null);
+  const [colForm,         setColForm]          = useState({name:"",reward:1});
   const [drawQuestion,    setDrawQuestion]     = useState("");
   const [drawOpt1,        setDrawOpt1]         = useState("是");
   const [drawOpt2,        setDrawOpt2]         = useState("否");
@@ -1335,6 +1337,12 @@ function App(){
     if(!d.cbtLog)                     d.cbtLog={};
     if(!d.morningStats)               d.morningStats={};
     if(!d.checkinDates)               d.checkinDates={};
+    if(!d.collectionTasks)            d.collectionTasks=[];
+    // 清理可能遗留的计时状态（防止意外卡死在"结束"按钮）
+    d.collectionTasks=d.collectionTasks.map(ct=>({
+      ...ct,records:ct.records||[],
+      reward:typeof ct.reward==="object"?ct.reward:{xp:ct.reward||1,long:{},short:{}},
+    }));
     // 迁移：把 localStorage 里的旧签到记录合并进 checkinDates
     for(let i=0;i<localStorage.length;i++){
       const key=localStorage.key(i);
@@ -1497,6 +1505,37 @@ function App(){
     save({...s,mainQuests:s.mainQuests.filter(q=>q.id!==id),sideQuests:s.sideQuests.filter(q=>q.id!==id),recurringQuests:s.recurringQuests.filter(q=>q.id!==id)});
     pop("🗑️ 已删除");
   };
+  // ─── 采集任务 ───
+  const startCollect=id=>{
+    save({...s,collectionTasks:(s.collectionTasks||[]).map(c=>c.id===id?{...c,isTiming:true,startTime:Date.now()}:c)});
+  };
+  const stopCollect=id=>{
+    const ct=(s.collectionTasks||[]).find(c=>c.id===id);
+    if(!ct||!ct.isTiming||!ct.startTime)return;
+    const elapsed=Math.round((Date.now()-ct.startTime)/1000);
+    const newRecords=[...(ct.records||[]),elapsed];
+    const newCt={...ct,isTiming:false,startTime:null,records:newRecords};
+    // 兼容旧数据：reward 可能是单纯数字，也可能是 {xp,long,short}
+    const r=typeof ct.reward==="object"?ct.reward:{xp:ct.reward||1,long:{},short:{}};
+    const gainedXp=r.xp||0;
+    const lc=r.long||{},sc=r.short||{};
+    const newLong=applyB(s.longStats,lc);
+    const newShort=applyB(s.shortStats,sc);
+    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+gainedXp,s.player.level,s.player.xpNext,s.badges);
+    save({...s,
+      collectionTasks:(s.collectionTasks||[]).map(c=>c.id===id?newCt:c),
+      player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
+      longStats:newLong,shortStats:newShort,
+    });
+    const mins=Math.floor(elapsed/60),secs=elapsed%60;
+    const timeStr=mins>0?`${mins}分${secs}秒`:`${secs}秒`;
+    if(s.player.level!==lv){setNewBadge(latestBadge);}
+    else pop(`🍏 用时 ${timeStr} · ${rwdTxt(r,s.longStats,s.shortStats)}`);
+  };
+  const deleteCollect=id=>{
+    save({...s,collectionTasks:(s.collectionTasks||[]).filter(c=>c.id!==id)});
+    pop("🗑️ 已删除");
+  };
   const completeRecurring=id=>{
     const q=s.recurringQuests.find(x=>x.id===id);if(!q)return;
     const r=q.reward||{};
@@ -1557,6 +1596,15 @@ function App(){
   const deleteHabit=id=>{save({...s,habits:s.habits.filter(h=>h.id!==id)});setModal(null);setHabEdit(null);pop("🗑️ 已删除");};
   const saveQuest=()=>{
     if(!qForm.title.trim())return;
+    if(qForm.type==="collect"){
+      const reward={xp:Number(qForm.xp)||1,long:{...qForm.long},short:{...qForm.short}};
+      Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
+      Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
+      const newCt={id:"col_"+Date.now(),name:qForm.title.trim(),desc:qForm.desc,reward,records:[],isTiming:false,startTime:null};
+      save({...s,collectionTasks:[...(s.collectionTasks||[]),newCt]});
+      setModal(null);setQForm(null);pop(`🍏 已添加「${newCt.name}」`);
+      return;
+    }
     const reward={xp:Number(qForm.xp)||10,long:{...qForm.long},short:{...qForm.short}};
     Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
     Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
@@ -1827,7 +1875,7 @@ function App(){
         {tab==="quests"&&<>
           {/* 快速电梯 */}
           <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-            {[["q-main","🌵"],["q-side","🌳"],["q-recurring","💦"]].map(([id,label])=>(
+            {[["q-main","🌵"],["q-side","🌳"],["q-recurring","💦"],["q-collect","🍏"]].map(([id,label])=>(
               <button key={id} onClick={()=>{
                   const el=document.getElementById(id);
                   if(!el)return;
@@ -1908,6 +1956,44 @@ function App(){
                   <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
                 </div>
               </div>;
+            })}
+          </ACCard>
+          </div>
+
+          {/* 采集任务 */}
+          <div id="q-collect">
+          <ACCard title={t("🍏 采集任务","🍏 Collect")} action={<button style={S.plusBtn} onClick={()=>{setQForm({type:"collect",title:"",desc:"",xp:1,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
+            {(s.collectionTasks||[]).length===0&&<div style={S.empty}>添加一个采集任务，记录每次用时吧 🍏</div>}
+            {(s.collectionTasks||[]).map(ct=>{
+              const timing=!!ct.isTiming;
+              const records=ct.records||[];
+              const avgSec=records.length>0?Math.round(records.reduce((a,b)=>a+b,0)/records.length):null;
+              const fmt=sec=>{const m=Math.floor(sec/60),s2=sec%60;return m>0?`${m}分${s2}秒`:`${s2}秒`;};
+              const r=typeof ct.reward==="object"?ct.reward:{xp:ct.reward||1,long:{},short:{}};
+              return(
+                <div key={ct.id} style={{padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>🍏 {ct.name}</div>
+                      {ct.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{ct.desc}</div>}
+                      <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(r,s.longStats,s.shortStats)}</div>
+                      <div style={{fontSize:11,color:"#B09070",marginTop:3}}>
+                        已记录 {records.length} 次{avgSec!=null&&` · 平均 ${fmt(avgSec)}`}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      {timing
+                        ?<button style={{...S.dBtn,background:"#FFD166",color:"#7A4A00"}} onClick={()=>stopCollect(ct.id)}>结束</button>
+                        :<button style={S.dBtn} onClick={()=>startCollect(ct.id)}>开始</button>
+                      }
+                      <button style={S.xBtn} onClick={()=>deleteCollect(ct.id)}>🗑</button>
+                    </div>
+                  </div>
+                  {timing&&(
+                    <div style={{marginTop:8,fontSize:11,color:"#A06000",fontWeight:700}}>⏳ 计时中…</div>
+                  )}
+                </div>
+              );
             })}
           </ACCard>
           </div>
@@ -2604,7 +2690,7 @@ function App(){
         <Drawer onClose={()=>{setModal(null);setQForm(null);}}>
           <div style={S.dH}>{t("岛上新任务 🏝️","New Quest 🏝️")}</div>
           <div style={S.tog}>
-            {[["main",t("🌵 开荒主线","🌵 Pioneer")],["side",t("🌳 种树任务","🌳 Plant")],["recurring",t("💦 浇水任务","💦 Water")]].map(([t,l])=>(
+            {[["main",t("🌵 开荒主线","🌵 Pioneer")],["side",t("🌳 种树任务","🌳 Plant")],["recurring",t("💦 浇水任务","💦 Water")],["collect",t("🍏 采集任务","🍏 Collect")]].map(([t,l])=>(
               <button key={t} style={{...S.tBtn,...(qForm.type===t?S.tOn:{})}} onClick={()=>setQForm(p=>({...p,type:t}))}>{l}</button>
             ))}
           </div>
@@ -2614,7 +2700,7 @@ function App(){
             ))}
           </div>}
           <FL>任务名称</FL>
-          <input style={S.inp} placeholder="例：完成项目" value={qForm.title} onChange={e=>setQForm(p=>({...p,title:e.target.value}))}/>
+          <input style={S.inp} placeholder={qForm.type==="collect"?"例：摸鱼、拔草、捡贝壳":"例：完成项目"} value={qForm.title} onChange={e=>setQForm(p=>({...p,title:e.target.value}))}/>
           <FL>描述（可选）</FL>
           <input style={S.inp} placeholder="例：本月完成" value={qForm.desc} onChange={e=>setQForm(p=>({...p,desc:e.target.value}))}/>
           {qForm.type==="main"
