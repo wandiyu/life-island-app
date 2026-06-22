@@ -793,7 +793,7 @@ const Leaf=({x,y,r=0,s=1,c="#7BC67E"})=>(
 );
 
 // AC-style header cloud/hill SVG
-function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift,onBadge,onDraw,shortStats,onStatChange}){
+function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift,onBadge,onDraw,shortStats,onStatChange,onToggleHabit}){
   const t=useT();
   const hour=new Date().getHours();
 
@@ -988,12 +988,12 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
           {habits.map(h=>{
             const done=!!th[h.id];
             return(
-              <div key={h.id} title={h.label} style={{
+              <div key={h.id} title={h.label} onClick={()=>onToggleHabit&&onToggleHabit(h.id)} style={{
                 width:30,height:30,borderRadius:"50%",
                 background:done?"rgba(255,255,255,.9)":"rgba(255,255,255,.3)",
                 border:`1.5px solid ${done?"rgba(255,255,255,.95)":"rgba(255,255,255,.4)"}`,
                 display:"flex",alignItems:"center",justifyContent:"center",
-                fontSize:14,transition:"all .25s",
+                fontSize:14,transition:"all .25s",cursor:"pointer",
                 boxShadow:done?"0 2px 6px rgba(0,0,0,.15)":"none",
               }}>{h.icon}</div>
             );
@@ -1729,6 +1729,7 @@ function App(){
         onBadge={()=>setModal("badges")}
         shortStats={s.shortStats}
         onStatChange={(k,delta)=>{setEvForm({text:"",xp:1,changes:{[k]:delta}});setModal("bigEvent");}}
+        onToggleHabit={toggleHabit}
       />
 
       {/* tab bar */}
