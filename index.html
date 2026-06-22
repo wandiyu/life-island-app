@@ -196,8 +196,6 @@ const useT = () => {
   const lang = React.useContext(LangCtx);
   return (zh, en) => lang === "en" ? en : zh;
 };
-// Convenience: call at top of any component
-const useLang = () => React.useContext(LangCtx);
 const T = {
   home:["主页","Home"],quests:["任务","Quests"],habits:["打卡","Check-in"],log:["记录","Log"],
 };
@@ -234,14 +232,18 @@ const fbSave = (uid, data) => {
 };
 
 // ─── time ────────────────────────────────────────────────
+// 游戏内"今天"对应的真实 Date 对象：00:00~04:59 算作前一天（与 todayKey 的字符串版本保持同一套规则）
+// 所有需要判断"今天/本周属于哪一天"的逻辑都应基于此函数，而不是直接用 new Date()，
+// 否则会出现"每日重置遵循05:00规则，但周边界/周结算却用自然日午夜"的不一致
+const gameDate = (d=new Date()) => {
+  const dt = new Date(d);
+  if (dt.getHours() < 5) dt.setDate(dt.getDate()-1);
+  return dt;
+};
 const todayKey = () => {
-  const now = new Date();
-  if(now.getHours() < 5){ now.setDate(now.getDate()-1); }
-  return now.toLocaleDateString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit" });
+  return gameDate().toLocaleDateString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit" });
 };
 const nowHour  = () => new Date().getHours();
-const weekKey  = d => { const dt=new Date(d||Date.now()); const y=dt.getFullYear(); const s=new Date(y,0,1); return `${y}-W${Math.ceil(((dt-s)/86400000+s.getDay()+1)/7)}`; };
-const monthKey = d => { const dt=new Date(d||Date.now()); return `${dt.getFullYear()}-${dt.getMonth()+1}`; };
 const canDoR   = q => {
   if (!q.lastDone) return true;
   const now = new Date();
@@ -557,6 +559,7 @@ const INIT={
   shortStats:    DEF_SHORT,
   habits:        DEF_HABITS,
   checkedHabits: {},
+  habitAppliedShort: {},  // dateKey → {habitId: {statKey: actualDelta}} 记录打卡时实际生效的短期属性增量（用于精确撤销，避免clamp导致的数值漂移）
   mainQuests:[
     {id:1,title:"建立稳定收入来源",desc:"副业或主业的突破",      reward:{xp:20,long:{wealth:10}},done:false},
     {id:2,title:"养成运动习惯",    desc:"每周锻炼3次，坚持3个月",reward:{xp:20,long:{health:8}}, done:false},
@@ -596,13 +599,14 @@ const INIT={
 };
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
-const applyB = (stats,bonus={})=>{
+// 简单加成：clamp 在 0~100 之间，超出部分直接被截断丢弃（不转换为其他奖励）
+const applyBonusClamped = (stats,bonus={})=>{
   const out={};
   Object.keys(stats).forEach(k=>{out[k]={...stats[k],value:clamp(stats[k].value+(bonus[k]||0))};});
   return out;
 };
-// Apply bonus to longStats with overflow → flowers
-const applyLongWithOverflow = (longStats, bonus={})=>{
+// 带溢出的加成：仅用于 longStats。超过100的部分不会被丢弃，而是按1:1转换为花瓣(🌸/xp)返还
+const applyBonusWithOverflow = (longStats, bonus={})=>{
   const out={...longStats};
   let extraFlowers=0;
   Object.keys(bonus).forEach(k=>{
@@ -615,8 +619,9 @@ const applyLongWithOverflow = (longStats, bonus={})=>{
 };
 
 // Get week key in 年-W周 format (week starts Sunday)
+// Get week key in 年-W周 format (week starts Sunday)。date 会先经过 gameDate() 调整05:00边界。
 const getWeekKey = (date=new Date())=>{
-  const d=new Date(date);
+  const d=gameDate(date);
   const day=d.getDay(); // 0=Sunday
   const sunday=new Date(d);sunday.setDate(d.getDate()-day);
   const y=sunday.getFullYear();
@@ -625,18 +630,10 @@ const getWeekKey = (date=new Date())=>{
   return `${y}-W${weekNum}`;
 };
 
-// Get the Saturday of the current week
-const getWeekSaturday = ()=>{
-  const d=new Date();
-  const day=d.getDay();
-  const sat=new Date(d);sat.setDate(d.getDate()+(6-day));
-  return sat;
-};
-
-// Count how many times a habit was checked in the week containing refDate (Sun–Sat)
+// Count how many times a habit was checked in the week containing refDate (Sun–Sat)。refDate 会先经过 gameDate() 调整05:00边界。
 const countWeekChecks=(checkedHabits,habitId,refDate=new Date())=>{
   let count=0;
-  const now=new Date(refDate);
+  const now=gameDate(refDate);
   const day=now.getDay();
   const sunday=new Date(now);sunday.setDate(now.getDate()-day);
   for(let i=0;i<=6;i++){
@@ -648,6 +645,8 @@ const countWeekChecks=(checkedHabits,habitId,refDate=new Date())=>{
 };
 
 // Migrate old weeklyBonus.stat (string) to weeklyBonus.stats (array)
+// ⚠️ 仅供 initData 数据加载迁移阶段调用一次；组件内不应重复调用——
+// 凡是从 s.habits 读出的数据，在这里已完成迁移，可视为干净数据直接使用
 const migrateWeeklyBonus=(h)=>{
   if(!h.weeklyBonus) return {...h,weeklyBonus:{stats:[]},weeklyTarget:h.weeklyTarget||5};
   if(h.weeklyBonus.stat!==undefined&&!h.weeklyBonus.stats){
@@ -661,8 +660,8 @@ const migrateWeeklyBonus=(h)=>{
 
 // Run weekly settlement - returns {newLongStats, extraFlowers, gains}
 const runWeeklySettle=(habits,checkedHabits,longStats)=>{
-  // 结算上周（周日触发时，上周六是昨天）
-  const lastSat=new Date();lastSat.setDate(lastSat.getDate()-1);
+  // 结算上周（游戏内周日触发时，游戏内上周六是"昨天"）
+  const lastSat=gameDate();lastSat.setDate(lastSat.getDate()-1);
   const gains=[];
   let bonusMap={};
   habits.forEach(h=>{
@@ -677,7 +676,7 @@ const runWeeklySettle=(habits,checkedHabits,longStats)=>{
       });
     }
   });
-  const{longStats:newLong,extraFlowers}=applyLongWithOverflow(longStats,bonusMap);
+  const{longStats:newLong,extraFlowers}=applyBonusWithOverflow(longStats,bonusMap);
   return{newLongStats:newLong,extraFlowers,gains};
 };
 const rwdTxt=(r={},ls=DEF_LONG,ss=DEF_SHORT)=>{
@@ -1274,6 +1273,7 @@ function App(){
   const [ceremonyNick,    setCeremonyNick]     = useState("");
   const [stepCapQuest,    setStepCapQuest]     = useState(null);
   const [colForm,         setColForm]          = useState({name:"",reward:1});
+  const [staleTimers,     setStaleTimers]       = useState([]); // 加载时检测到超过1小时仍在计时的采集任务，等待用户确认是否丢弃
   const [drawQuestion,    setDrawQuestion]     = useState("");
   const [drawOpt1,        setDrawOpt1]         = useState("是");
   const [drawOpt2,        setDrawOpt2]         = useState("否");
@@ -1329,6 +1329,7 @@ function App(){
     if(!d){const ns={...INIT,lastDate:today,lastResetDate:today};dbSet(ns);setS(ns);return;}
     if(!Array.isArray(d.habits))      d.habits=DEF_HABITS;
     if(!d.checkedHabits)              d.checkedHabits={};
+    if(!d.habitAppliedShort)          d.habitAppliedShort={};
     if(!d.recurringQuests)            d.recurringQuests=INIT.recurringQuests;
     if(!d.rescueList)                 d.rescueList=DEF_RESCUE;
     else{const existing=new Set(d.rescueList);const added=DEF_RESCUE.filter(x=>!existing.has(x));if(added.length)d.rescueList=[...d.rescueList,...added];}
@@ -1338,11 +1339,16 @@ function App(){
     if(!d.morningStats)               d.morningStats={};
     if(!d.checkinDates)               d.checkinDates={};
     if(!d.collectionTasks)            d.collectionTasks=[];
-    // 清理可能遗留的计时状态（防止意外卡死在"结束"按钮）
+    // 字段兜底：确保 records/reward 结构完整（不清理 isTiming，避免误杀正常进行中的计时）
     d.collectionTasks=d.collectionTasks.map(ct=>({
       ...ct,records:ct.records||[],
       reward:typeof ct.reward==="object"?ct.reward:{xp:ct.reward||1,long:{},short:{}},
     }));
+    // 检测卡死的计时状态：开始计时超过1小时仍未结束，很可能是页面被意外关闭/杀进程导致的遗留状态
+    // 不自动清理（可能是真实的长时长任务），而是收集起来，加载完成后询问用户是否丢弃
+    const staleCollectTimers=d.collectionTasks.filter(ct=>
+      ct.isTiming&&ct.startTime&&(Date.now()-ct.startTime)>3600000
+    ).map(ct=>({id:ct.id,name:ct.name,startTime:ct.startTime}));
     // 迁移：把 localStorage 里的旧签到记录合并进 checkinDates
     for(let i=0;i<localStorage.length;i++){
       const key=localStorage.key(i);
@@ -1422,10 +1428,10 @@ function App(){
       d={...d,shortStats:rs,history:hist,lastDate:today,lastResetDate:resetDay};
     } else if(d.lastDate!==today){d={...d,lastDate:today};}
 
-    // Check weekly settlement: trigger if it's Saturday (day 6) and not yet settled this week
+    // Check weekly settlement: trigger if it's (game-day) Sunday and not yet settled this week
     const now=new Date();
     const curWeekKey=getWeekKey(now);
-    if(now.getDay()===0&&d.lastWeeklySettleDate!==curWeekKey){
+    if(gameDate(now).getDay()===0&&d.lastWeeklySettleDate!==curWeekKey){
       const{newLongStats,extraFlowers,gains}=runWeeklySettle(d.habits,d.checkedHabits,d.longStats);
       d={...d,longStats:newLongStats,player:{...d.player,xp:d.player.xp+extraFlowers},
          lastWeeklySettleDate:curWeekKey,
@@ -1442,6 +1448,8 @@ function App(){
     d={...d,fishPond:updateFishMissed(d.fishPond,today)};
 
     dbSet(d);setS(d);
+    // 提醒用户处理卡死超过1小时的采集任务计时
+    if(staleCollectTimers.length>0) setStaleTimers(staleCollectTimers);
     // 签到检测：每天05:00后首次打开时弹出
     const morningKey=`morningCheckin_${today}`;
     if(!d.checkinDates?.[today]&&h>=5){
@@ -1471,17 +1479,40 @@ function App(){
     return{xp,lv,xpN:100,newBadges:nb,latestBadge:latest};
   };
 
+  // ─── 统一奖励结算 ───
+  // 拆分 reward.long/short → 应用到属性（longOverflow=true 时长期属性溢出转花瓣）→ 升级判断
+  // 返回新的 player/badges/longStats/shortStats 片段，以及 didLevelUp/latestBadge 供调用处决定提示文案
+  const grantReward=(reward={},{longOverflow=false}={})=>{
+    const lc={},sc={};
+    Object.keys(s.longStats).forEach(k=>{if(reward.long&&reward.long[k])lc[k]=reward.long[k];});
+    Object.keys(s.shortStats).forEach(k=>{if(reward.short&&reward.short[k])sc[k]=reward.short[k];});
+    let newLong,extraFlowers=0;
+    if(longOverflow){
+      const r=applyBonusWithOverflow(s.longStats,lc);
+      newLong=r.longStats;extraFlowers=r.extraFlowers;
+    } else {
+      newLong=applyBonusClamped(s.longStats,lc);
+    }
+    const newShort=applyBonusClamped(s.shortStats,sc);
+    const{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+(reward.xp||0)+extraFlowers,s.player.level,s.player.xpNext,s.badges);
+    return{
+      player:{...s.player,xp,level:lv,xpNext:xpN},
+      badges:newBadges,
+      longStats:newLong,
+      shortStats:newShort,
+      didLevelUp:s.player.level!==lv,
+      latestBadge,
+      lc,sc, // 拆分后的实际加成（供调用处写入 bigEvent.statChanges 等）
+    };
+  };
+
   const completeQuest=id=>{
     const all=[...s.mainQuests,...s.sideQuests];const q=all.find(x=>x.id===id);if(!q||q.done)return;
     const r=q.reward||{};
-    const lc={},sc={};
-    Object.keys(s.longStats).forEach(k=>{if(r.long&&r.long[k])lc[k]=r.long[k];});
-    Object.keys(s.shortStats).forEach(k=>{if(r.short&&r.short[k])sc[k]=r.short[k];});
-    const{longStats:newLong,extraFlowers}=applyLongWithOverflow(s.longStats,lc);
-    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+(r.xp||0)+extraFlowers,s.player.level,s.player.xpNext,s.badges);
+    const{player,badges,longStats,shortStats,didLevelUp,latestBadge,lc,sc}=grantReward(r,{longOverflow:true});
     const isMain=s.mainQuests.find(x=>x.id===id);
     const toastMsg=isMain?randPick(MAIN_TOASTS):randPick(SIDE_TOASTS);
-    if(s.player.level===lv)pop(`${toastMsg} ${rwdTxt(r,s.longStats,s.shortStats)}`);
+    if(!didLevelUp)pop(`${toastMsg} ${rwdTxt(r,s.longStats,s.shortStats)}`);
     else{if(latestBadge)setNewBadge(latestBadge);}
     // 确保"任务"标签存在
     const existingTags=s.eventTags||[];
@@ -1491,10 +1522,7 @@ function App(){
       :(q.title+(q.desc?`：${q.desc}`:""))
       ,xp:r.xp||0,statChanges:{...lc,...sc},tag:"任务"};
     save({...s,
-      player:{...s.player,xp,level:lv,xpNext:xpN},
-      badges:newBadges,
-      longStats:newLong,
-      shortStats:applyB(s.shortStats,sc),
+      player,badges,longStats,shortStats,
       mainQuests:s.mainQuests.filter(q2=>q2.id!==id),
       sideQuests:s.sideQuests.filter(q2=>q2.id!==id),
       bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),
@@ -1517,34 +1545,37 @@ function App(){
     const newCt={...ct,isTiming:false,startTime:null,records:newRecords};
     // 兼容旧数据：reward 可能是单纯数字，也可能是 {xp,long,short}
     const r=typeof ct.reward==="object"?ct.reward:{xp:ct.reward||1,long:{},short:{}};
-    const gainedXp=r.xp||0;
-    const lc=r.long||{},sc=r.short||{};
-    const newLong=applyB(s.longStats,lc);
-    const newShort=applyB(s.shortStats,sc);
-    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+gainedXp,s.player.level,s.player.xpNext,s.badges);
+    const{player,badges,longStats,shortStats,didLevelUp,latestBadge}=grantReward(r,{longOverflow:true});
     save({...s,
       collectionTasks:(s.collectionTasks||[]).map(c=>c.id===id?newCt:c),
-      player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
-      longStats:newLong,shortStats:newShort,
+      player,badges,longStats,shortStats,
     });
     const mins=Math.floor(elapsed/60),secs=elapsed%60;
     const timeStr=mins>0?`${mins}分${secs}秒`:`${secs}秒`;
-    if(s.player.level!==lv){setNewBadge(latestBadge);}
+    if(didLevelUp){setNewBadge(latestBadge);}
     else pop(`🍏 用时 ${timeStr} · ${rwdTxt(r,s.longStats,s.shortStats)}`);
   };
   const deleteCollect=id=>{
     save({...s,collectionTasks:(s.collectionTasks||[]).filter(c=>c.id!==id)});
     pop("🗑️ 已删除");
   };
+  // 丢弃一条卡死的计时记录：重置该任务的 isTiming/startTime，不计入 records，下次可重新开始计时
+  const discardStaleTimer=id=>{
+    save({...s,collectionTasks:(s.collectionTasks||[]).map(c=>c.id===id?{...c,isTiming:false,startTime:null}:c)});
+    setStaleTimers(prev=>prev.filter(t=>t.id!==id));
+    pop("🗑️ 已丢弃这次计时");
+  };
+  // 保留：用户确认这是真实的长时长任务，继续计时，仅关闭本次提醒
+  const keepStaleTimer=id=>{
+    setStaleTimers(prev=>prev.filter(t=>t.id!==id));
+  };
   const completeRecurring=id=>{
     const q=s.recurringQuests.find(x=>x.id===id);if(!q)return;
     const r=q.reward||{};
-    const gained=r.xp||0;
-    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+gained,s.player.level,s.player.xpNext,s.badges);
-    if(s.player.level===lv)pop(`${randPick(RECURRING_TOASTS)(q.title)} ${rwdTxt(r,s.longStats,s.shortStats)}`);
+    const{player,badges,longStats,shortStats,didLevelUp,latestBadge}=grantReward(r,{longOverflow:true});
+    if(!didLevelUp)pop(`${randPick(RECURRING_TOASTS)(q.title)} ${rwdTxt(r,s.longStats,s.shortStats)}`);
     else{if(latestBadge)setNewBadge(latestBadge);}
-    save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
-      longStats:applyB(s.longStats,r.long||{}),shortStats:applyB(s.shortStats,r.short||{}),
+    save({...s,player,badges,longStats,shortStats,
       recurringQuests:s.recurringQuests.map(q2=>q2.id===id?{...q2,lastDone:new Date().toISOString()}:q2),
     });
   };
@@ -1552,15 +1583,22 @@ function App(){
     const today=todayKey(),th=s.checkedHabits[today]||{},was=!!th[hid];
     const h=s.habits.find(x=>x.id===hid);if(!h)return;
     let ns={...s,checkedHabits:{...s.checkedHabits,[today]:{...th,[hid]:!was}}};
+    const todayApplied=s.habitAppliedShort?.[today]||{};
     if(!was){
       // Apply short stats (capped 0~100, supports negative bonus)
+      // 记录实际生效的增量（被clamp截断后的真实差值），供撤销时精确回退
       const sb=h.shortBonus||{};
       const newShort={};
+      const applied={};
       Object.keys(ns.shortStats).forEach(k=>{
         const add=sb[k]||0;
-        newShort[k]={...ns.shortStats[k],value:Math.min(100,Math.max(0,ns.shortStats[k].value+add))};
+        const oldVal=ns.shortStats[k].value;
+        const newVal=Math.min(100,Math.max(0,oldVal+add));
+        newShort[k]={...ns.shortStats[k],value:newVal};
+        if(add!==0) applied[k]=newVal-oldVal;
       });
       ns.shortStats=newShort;
+      ns.habitAppliedShort={...s.habitAppliedShort,[today]:{...todayApplied,[hid]:applied}};
       // +1 flower (xp)
       ns.player={...ns.player,xp:ns.player.xp+1};
       // 检测今日全部完成
@@ -1574,14 +1612,17 @@ function App(){
         pop(randPick(HABIT_TOASTS)(h.icon,h.label));
       }
     } else {
-      // Undo short stats
+      // Undo short stats：优先用记录的实际生效增量精确回退；没有记录（旧数据）则退回原算法
+      const recorded=todayApplied[hid];
       const sb=h.shortBonus||{};
       const newShort={};
       Object.keys(ns.shortStats).forEach(k=>{
-        const add=sb[k]||0;
+        const add=recorded?(recorded[k]||0):(sb[k]||0);
         newShort[k]={...ns.shortStats[k],value:Math.min(100,Math.max(0,ns.shortStats[k].value-add))};
       });
       ns.shortStats=newShort;
+      const restApplied={...todayApplied};delete restApplied[hid];
+      ns.habitAppliedShort={...s.habitAppliedShort,[today]:restApplied};
       // -1 flower
       ns.player={...ns.player,xp:Math.max(0,ns.player.xp-1)};
     }
@@ -1633,16 +1674,15 @@ function App(){
       pop("✏️ 大事已更新");
     } else {
       const ev={id:Date.now(),date:todayKey(),text:evForm.text,xp:evXp,statChanges:evForm.changes,tag:evForm.tag||""};
-      const{longStats:newLong,extraFlowers}=applyLongWithOverflow(s.longStats,lc);
-      let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+evXp+extraFlowers,s.player.level,s.player.xpNext,s.badges);
-      if(s.player.level===lv)pop("📝 岛上新闻更新中……");
+      const{player,badges,longStats,shortStats,didLevelUp,latestBadge}=grantReward({xp:evXp,long:lc,short:sc},{longOverflow:true});
+      if(!didLevelUp)pop("📝 岛上新闻更新中……");
       else{if(latestBadge)setNewBadge(latestBadge);}
-      save({...s,player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,bigEvents:[...s.bigEvents,ev].slice(-2000),longStats:newLong,shortStats:applyB(s.shortStats,sc)});
+      save({...s,player,badges,bigEvents:[...s.bigEvents,ev].slice(-2000),longStats,shortStats});
     }
     setModal(null);setEvForm(null);
   };
   const handleImport=d=>{
-    const merged={...INIT,...d,lastDate:todayKey(),lastResetDate:todayKey(),checkedHabits:d.checkedHabits||{},badges:d.badges||[],dayColors:d.dayColors||{},daySummaries:d.daySummaries||{},motto:d.motto||INIT.motto,eventTags:d.eventTags||INIT.eventTags,lastWeeklySettleDate:d.lastWeeklySettleDate||"",pendingWeeklyResult:null};
+    const merged={...INIT,...d,lastDate:todayKey(),lastResetDate:todayKey(),checkedHabits:d.checkedHabits||{},habitAppliedShort:d.habitAppliedShort||{},badges:d.badges||[],dayColors:d.dayColors||{},daySummaries:d.daySummaries||{},motto:d.motto||INIT.motto,eventTags:d.eventTags||INIT.eventTags,lastWeeklySettleDate:d.lastWeeklySettleDate||"",pendingWeeklyResult:null};
     save(merged);pop("✅ 数据导入成功！");setShowSettings(false);
   };
 
@@ -1718,6 +1758,25 @@ function App(){
           </div>
         </div>
       )}
+
+      {/* 卡死计时提醒：检测到采集任务计时超过1小时未结束，可能是页面被意外关闭导致 */}
+      {staleTimers.length>0&&(()=>{
+        const cur=staleTimers[0];
+        const hrs=Math.floor((Date.now()-cur.startTime)/3600000);
+        return(
+          <div style={S.modalCenter}>
+            <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 22px",maxWidth:320,width:"92%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.25)",border:"3px solid #FFD166"}}>
+              <div style={{fontSize:26,marginBottom:8}}>⏱️</div>
+              <div style={{fontSize:15,fontWeight:900,color:"#3D2B1F",marginBottom:8}}>「{cur.name}」还在计时</div>
+              <div style={{fontSize:13,color:"#7A5C44",marginBottom:18,lineHeight:1.5}}>
+                已经过去 {hrs} 小时了，可能是上次忘记点击"结束"，或是页面被意外关闭。<br/>要保留这次记录继续计时，还是丢弃重新开始？
+              </div>
+              <button style={S.cfmBtn} onClick={()=>keepStaleTimer(cur.id)}>{t("这是真的，继续计时","Keep timing")}</button>
+              <button style={{...S.cfmBtn,marginTop:8,background:"#FFF0EE",color:"#C0392B",boxShadow:"none",border:"2px solid #FFB3A8"}} onClick={()=>discardStaleTimer(cur.id)}>{t("丢弃这次计时","Discard")}</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* settings drawer */}
       {showSettings&&(
@@ -2216,7 +2275,7 @@ function App(){
 
       {/* 睡前复盘弹窗 */}
       {showCbt&&s&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setShowCbt(false)}>
+        <div style={S.modalCenter} onClick={()=>setShowCbt(false)}>
           <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px 24px",width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #D4EED4",animation:"pop .25s ease"}} onClick={e=>e.stopPropagation()}>
             <div style={{textAlign:"center",marginBottom:22}}>
               <div style={{fontSize:26,marginBottom:6}}>🌙</div>
@@ -2275,7 +2334,7 @@ function App(){
 
       {/* 签到弹窗 */}
       {showMorning&&s&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setShowMorning(false)}>
+        <div style={S.modalCenter} onClick={()=>setShowMorning(false)}>
           <div style={{background:"#FFFDF5",borderRadius:28,padding:"28px 24px 24px",width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #D4EED4",animation:"pop .25s ease"}} onClick={e=>e.stopPropagation()}>
             {/* 标题 */}
             <div style={{textAlign:"center",marginBottom:22}}>
@@ -2401,7 +2460,7 @@ function App(){
       )}
 
       {modal==="badges"&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setModal(null)}>
+        <div style={S.modalCenter} onClick={()=>setModal(null)}>
           <div style={{background:"#FFFDF5",borderRadius:28,padding:"24px 20px",width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #EDD9A3",animation:"pop .25s ease",maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
               <div style={{fontSize:16,fontWeight:900,color:"#3D2B1F"}}>⛵️ 离岛旅行</div>
@@ -2416,7 +2475,7 @@ function App(){
       )}
 
       {modal==="fishFriends"&&s&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setModal(null)}>
+        <div style={S.modalCenter} onClick={()=>setModal(null)}>
           <div style={{background:"#FFFDF5",borderRadius:28,padding:"24px 20px",width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #B8DFF5",animation:"pop .25s ease",maxHeight:"75vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{textAlign:"center",marginBottom:18}}>
               <div style={{fontSize:22,fontWeight:900,color:"#1A5A7A"}}>🫧 常驻朋友</div>
@@ -2612,7 +2671,7 @@ function App(){
 
       {/* 抽签弹窗 */}
       {modal==="draw"&&s&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}}
+        <div style={S.modalCenter}
           onClick={()=>{
             if(drawCounting!=null) return; // 倒数中不可关闭
             setModal(null);setDrawCounting(null);setDrawResult(null);
@@ -3625,38 +3684,6 @@ const GIFT_THEMES=[
 
 const CONFETTI_COLORS=["#a7c957","#c2d96a","#7fa832","#daeea3","#4e6a1a","#e8f5b8","#8fb840","#f4f9e8"];
 
-function GiftBoxButton({onClick}){
-  const [hover,setHover]=useState(false);
-  return(
-    <button
-      onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
-      onClick={onClick}
-      style={{width:"100%",background:"linear-gradient(135deg,#f4f9e8,#eef6d8)",border:"2.5px solid #a7c957",borderRadius:20,padding:"0",cursor:"pointer",boxShadow:"0 4px 18px rgba(167,201,87,.22)",marginBottom:12,overflow:"hidden",display:"block"}}
-    >
-      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:14,padding:"16px 20px"}}>
-        <div style={{animation:hover?"giftBounce .5s ease infinite":"giftFloat 2.8s ease-in-out infinite",flexShrink:0}}>
-          <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="6" y="22" width="32" height="18" rx="3" fill="#daeea3" stroke="#a7c957" strokeWidth="1.5"/>
-            <rect x="4" y="16" width="36" height="8" rx="3" fill="#a7c957" stroke="#7fa832" strokeWidth="1.5"/>
-            <rect x="19.5" y="22" width="5" height="18" fill="#7fa832" opacity="0.6"/>
-            <rect x="4" y="19" width="36" height="5" fill="#7fa832" opacity="0.6"/>
-            <ellipse cx="16" cy="16" rx="6" ry="4" fill="#a7c957" stroke="#7fa832" strokeWidth="1" transform="rotate(-20 16 16)"/>
-            <ellipse cx="28" cy="16" rx="6" ry="4" fill="#a7c957" stroke="#7fa832" strokeWidth="1" transform="rotate(20 28 16)"/>
-            <circle cx="22" cy="16" r="3.5" fill="#7fa832" stroke="#4e6a1a" strokeWidth="1"/>
-            <circle cx="36" cy="10" r="1.5" fill="#c8dc80" style={{animation:"sparkle 1.5s ease-in-out infinite"}}/>
-            <circle cx="10" cy="36" r="1" fill="#4e6a1a" style={{animation:"sparkle 1.8s ease-in-out .4s infinite"}}/>
-            <circle cx="38" cy="32" r="1.2" fill="#daeea3" style={{animation:"sparkle 2s ease-in-out .8s infinite"}}/>
-          </svg>
-        </div>
-        <div style={{textAlign:"left"}}>
-          <div style={{fontSize:15,fontWeight:900,color:"#4e6a1a",letterSpacing:.3}}>{randPick(GIFT_TRIGGERS)}</div>
-          <div style={{fontSize:11,color:"#7fa832",marginTop:2,fontWeight:600}}>点击拆开，获取今日充能建议 🌿</div>
-        </div>
-      </div>
-    </button>
-  );
-}
-
 function GiftModal({rescueList,onClose,onEditList,drawn,setDrawn,s,save,pop}){
   const t=useT();
   const [phase,setPhase]=useState("idle");
@@ -3809,7 +3836,8 @@ function BonusRow({stats,bonus,onChange}){
   </div>;
 }
 function HabitEditor({habit,longStats,shortStats,onSave,onDelete}){
-  const initD = migrateWeeklyBonus({...habit,weeklyBonus:habit.weeklyBonus||{stats:[]},weeklyTarget:habit.weeklyTarget||5,shortBonus:habit.shortBonus||{}});
+  // habit 已在 initData 阶段完成迁移（或由新增入口直接传入完整结构），这里只做简单兜底，不重复迁移逻辑
+  const initD = {...habit,weeklyBonus:habit.weeklyBonus||{stats:[]},weeklyTarget:habit.weeklyTarget||5,shortBonus:habit.shortBonus||{}};
   const [d,setD]=useState(initD);
   const upShort=(key,val)=>{const nb={...d.shortBonus};val!==0?nb[key]=val:delete nb[key];setD(p=>({...p,shortBonus:nb}));};
   const toggleStat=(k)=>{
@@ -3874,6 +3902,7 @@ const S={
   editTxtBtn:{background:"#F0FFF0",border:"2px solid #7BC67E",color:"#3A7D3E",borderRadius:12,padding:"4px 12px",fontSize:11,fontWeight:800,cursor:"pointer"},
   cfmBtn:  {width:"100%",background:"linear-gradient(135deg,#7BC67E,#5BAF5F)",border:"none",color:"#fff",borderRadius:16,padding:"15px",fontSize:15,fontWeight:900,boxShadow:"0 6px 20px rgba(91,175,95,.4)",cursor:"pointer"},
   overlay: {position:"fixed",inset:0,background:"rgba(30,20,10,.45)",zIndex:100,display:"flex",alignItems:"flex-end"},
+  modalCenter: {position:"fixed",inset:0,background:"rgba(20,40,20,.55)",zIndex:180,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"},
   drawer:  {background:"#FFFDF5",borderRadius:"24px 24px 0 0",padding:"8px 20px max(44px,env(safe-area-inset-bottom,44px))",width:"100%",maxWidth:480,margin:"0 auto",maxHeight:"88vh",overflowY:"auto",border:"2px solid #EDD9A3",borderBottom:"none"},
   handle:  {width:40,height:5,background:"#EDD9A3",borderRadius:3,margin:"0 auto 18px"},
   dH:      {fontSize:17,fontWeight:900,marginBottom:14,color:"#3D2B1F"},
