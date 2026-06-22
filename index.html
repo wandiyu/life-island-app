@@ -1734,9 +1734,8 @@ function App(){
       {/* tab bar */}
       <div style={{display:"flex",background:"#FFFDF5",borderTop:"3px solid #A8D8A8",borderBottom:"2px solid #D4EED4",position:"sticky",top:0,zIndex:10,boxShadow:"0 2px 12px rgba(91,175,95,.12)"}}>
         {TABS.map(([k,icon,l])=>(
-          <button key={k} className={tab===k?"tab-active":""} style={{flex:1,padding:"11px 2px 8px",background:"none",border:"none",color:tab===k?"#5BAF5F":"#B09070",fontSize:11,fontWeight:tab===k?900:600,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"all .2s"}} onClick={()=>setTab(k)}>
-            <span style={{fontSize:18,lineHeight:1}}>{icon}</span>
-            <span>{l}</span>
+          <button key={k} className={tab===k?"tab-active":""} style={{flex:1,padding:"14px 2px",background:"none",border:"none",color:tab===k?"#5BAF5F":"#B09070",fontSize:13,fontWeight:tab===k?900:600,cursor:"pointer",transition:"all .2s"}} onClick={()=>setTab(k)}>
+            {l}
           </button>
         ))}
       </div>
@@ -1747,7 +1746,7 @@ function App(){
         {/* ── 主页 ── */}
         {tab==="home"&&<>
           {/* 快速电梯 */}
-          <div style={{display:"flex",gap:2,position:"sticky",top:58,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+          <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
             {[["h-long","🍊"],["h-motto","🔮"]].map(([id,label])=>(
               <button key={id} onClick={()=>{
                   const el=document.getElementById(id);
@@ -1826,7 +1825,7 @@ function App(){
         </>}
         {tab==="quests"&&<>
           {/* 快速电梯 */}
-          <div style={{display:"flex",gap:2,position:"sticky",top:58,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+          <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
             {[["q-main","🌵"],["q-side","🌳"],["q-recurring","💦"]].map(([id,label])=>(
               <button key={id} onClick={()=>{
                   const el=document.getElementById(id);
@@ -1917,7 +1916,7 @@ function App(){
         {tab==="habits"&&(
           <>
           {/* 快速电梯 */}
-          <div style={{display:"flex",gap:2,position:"sticky",top:58,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+          <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
             {[["hb-today","🐠"],["hb-week","🐙"]].map(([id,label])=>(
               <button key={id} onClick={()=>{
                   const el=document.getElementById(id);
@@ -2017,7 +2016,7 @@ function App(){
         {/* ── 记录 ── */}
         {tab==="log"&&<>
           {/* 快速电梯 */}
-          <div style={{display:"flex",gap:2,position:"sticky",top:58,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+          <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
             {[["l-fish","🐋"],["l-rainbow","🌈"],["l-news","📰"]].map(([id,label])=>(
               <button key={id} onClick={()=>{
                   const el=document.getElementById(id);
