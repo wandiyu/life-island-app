@@ -243,6 +243,11 @@ const gameDate = (d=new Date()) => {
 const todayKey = () => {
   return gameDate().toLocaleDateString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit" });
 };
+// 游戏内当前所属月份的 key，格式 "年-月"，同样遵循05:00边界规则
+const monthKeyOf = (d=new Date()) => {
+  const dt = gameDate(d);
+  return `${dt.getFullYear()}-${dt.getMonth()+1}`;
+};
 const nowHour  = () => new Date().getHours();
 const canDoR   = q => {
   if (!q.lastDone) return true;
@@ -596,6 +601,7 @@ const INIT={
   morningStats: {},
   checkinDates: {},
   collectionTasks: [],
+  monthlyChallenge: {}, // monthKey("2026-6") → {title, target, count, achieved, checkedDates:[dateKey]} 每月只能设置一次目标，设置后title/target锁定不可改
 };
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
@@ -793,7 +799,7 @@ const Leaf=({x,y,r=0,s=1,c="#7BC67E"})=>(
 );
 
 // AC-style header cloud/hill SVG
-function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift,onBadge,onDraw,shortStats,onStatChange,onToggleHabit}){
+function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift,onBadge,onDraw,shortStats,onStatChange,onToggleHabit,monthlyChallenge,onToggleMonthlyChallenge,onMonthlyChallengeUnsetClick}){
   const t=useT();
   const hour=new Date().getHours();
 
@@ -985,6 +991,24 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
 
         {/* habit pills */}
         <div style={{display:"flex",gap:5,alignItems:"center",paddingBottom:24,flexWrap:"wrap",marginTop:6}}>
+          {/* 🌟 每月挑战，固定在最前面 */}
+          {(()=>{
+            const mc=monthlyChallenge;
+            const doneToday=mc&&todayKey&&(mc.checkedDates||[]).includes(todayKey());
+            return(
+              <div title={mc?mc.title:"本月还没设定挑战"}
+                onClick={()=>mc?(onToggleMonthlyChallenge&&onToggleMonthlyChallenge()):(onMonthlyChallengeUnsetClick&&onMonthlyChallengeUnsetClick())}
+                style={{
+                  width:30,height:30,borderRadius:"50%",
+                  background:!mc?"rgba(255,255,255,.15)":(doneToday?"rgba(255,255,255,.9)":"rgba(255,255,255,.3)"),
+                  border:`1.5px solid ${!mc?"rgba(255,255,255,.25)":(doneToday?"rgba(255,255,255,.95)":"rgba(255,255,255,.4)")}`,
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:14,transition:"all .25s",cursor:"pointer",
+                  boxShadow:doneToday?"0 2px 6px rgba(0,0,0,.15)":"none",
+                  opacity:!mc?.5:1,
+                }}>🌟</div>
+            );
+          })()}
           {habits.map(h=>{
             const done=!!th[h.id];
             return(
@@ -1274,6 +1298,7 @@ function App(){
   const [stepCapQuest,    setStepCapQuest]     = useState(null);
   const [colForm,         setColForm]          = useState({name:"",reward:1});
   const [staleTimers,     setStaleTimers]       = useState([]); // 加载时检测到超过1小时仍在计时的采集任务，等待用户确认是否丢弃
+  const [mcForm,          setMcForm]             = useState(null); // 每月挑战设置弹窗表单 {title,target}，null=未打开
   const [drawQuestion,    setDrawQuestion]     = useState("");
   const [drawOpt1,        setDrawOpt1]         = useState("是");
   const [drawOpt2,        setDrawOpt2]         = useState("否");
@@ -1339,6 +1364,7 @@ function App(){
     if(!d.morningStats)               d.morningStats={};
     if(!d.checkinDates)               d.checkinDates={};
     if(!d.collectionTasks)            d.collectionTasks=[];
+    if(!d.monthlyChallenge)           d.monthlyChallenge={};
     // 字段兜底：确保 records/reward 结构完整（不清理 isTiming，避免误杀正常进行中的计时）
     d.collectionTasks=d.collectionTasks.map(ct=>({
       ...ct,records:ct.records||[],
@@ -1578,6 +1604,48 @@ function App(){
     save({...s,player,badges,longStats,shortStats,
       recurringQuests:s.recurringQuests.map(q2=>q2.id===id?{...q2,lastDone:new Date().toISOString()}:q2),
     });
+  };
+  // ─── 每月挑战 🌟 ───
+  // 设置本月目标：每个月只能设置一次，设置后 title/target 锁定不可改（已存在则直接返回，不覆盖）
+  const setMonthlyChallenge=(title,target)=>{
+    const mk=monthKeyOf();
+    if(s.monthlyChallenge?.[mk]) return; // 本月已设置，锁定不可改
+    if(!title.trim()||!target||target<1) return;
+    save({...s,monthlyChallenge:{...s.monthlyChallenge,[mk]:{title:title.trim(),target:Math.round(target),count:0,achieved:false,checkedDates:[]}}});
+    pop("🌟 本月挑战已设定！");
+  };
+  // 打卡/取消打卡：每天最多一次，逻辑与 toggleHabit 一致（+1🌸，达标放烟花，仅首次达标触发）
+  const toggleMonthlyChallenge=()=>{
+    const mk=monthKeyOf();
+    const mc=s.monthlyChallenge?.[mk];
+    if(!mc) return; // 未设置目标，不可打卡
+    const today=todayKey();
+    const dates=mc.checkedDates||[];
+    const was=dates.includes(today);
+    let newCount,newDates;
+    if(!was){
+      newDates=[...dates,today];
+      newCount=mc.count+1;
+    } else {
+      newDates=dates.filter(d=>d!==today);
+      newCount=Math.max(0,mc.count-1);
+    }
+    const wasAchieved=!!mc.achieved;
+    const nowAchieved=newCount>=mc.target;
+    const newMc={...mc,count:newCount,checkedDates:newDates,achieved:nowAchieved};
+    const ns={...s,
+      monthlyChallenge:{...s.monthlyChallenge,[mk]:newMc},
+      player:{...s.player,xp:!was?s.player.xp+1:Math.max(0,s.player.xp-1)},
+    };
+    save(ns);
+    if(!was){
+      if(!wasAchieved&&nowAchieved){
+        setTimeout(()=>setShowFirework(true),100);
+        pop(`🌟 本月挑战达成！「${mc.title}」`);
+      } else {
+        pop(`🌟 ${mc.title} +1 🌸`);
+      }
+    }
   };
   const toggleHabit=hid=>{
     const today=todayKey(),th=s.checkedHabits[today]||{},was=!!th[hid];
@@ -1837,6 +1905,9 @@ function App(){
         shortStats={s.shortStats}
         onStatChange={(k,delta)=>{setEvForm({text:"",xp:1,changes:{[k]:delta}});setModal("bigEvent");}}
         onToggleHabit={toggleHabit}
+        monthlyChallenge={s.monthlyChallenge?.[monthKeyOf()]}
+        onToggleMonthlyChallenge={toggleMonthlyChallenge}
+        onMonthlyChallengeUnsetClick={()=>{setTab("habits");setTimeout(()=>setMcForm({title:"",target:10}),300);}}
       />
 
       {/* tab bar */}
@@ -2066,7 +2137,7 @@ function App(){
           <>
           {/* 快速电梯 */}
           <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-            {[["hb-today","🐠"],["hb-week","🐙"]].map(([id,label])=>(
+            {[["hb-today","🐠"],["hb-week","🐙"],["hb-monthly","🪼"]].map(([id,label])=>(
               <button key={id} onClick={()=>{
                   const el=document.getElementById(id);
                   if(!el)return;
@@ -2159,6 +2230,43 @@ function App(){
             </div>
 
           </div>
+
+          {/* 🪼 每月挑战 */}
+          {(()=>{
+            const mk=monthKeyOf();
+            const mc=s.monthlyChallenge?.[mk];
+            return(
+              <div id="hb-monthly" style={{background:"#FFFDF5",borderRadius:22,padding:"16px 16px",marginBottom:12,boxShadow:"0 4px 20px rgba(90,60,30,.08)",border:"2px solid #EDD9A3"}}>
+                <div style={{fontSize:12,color:"#7A5C44",fontWeight:900,letterSpacing:.5,marginBottom:12}}>🪼 每月挑战</div>
+                {!mc ? (
+                  <div style={{textAlign:"center",padding:"8px 0"}}>
+                    <div style={{fontSize:12,color:"#B09070",marginBottom:10}}>本月还没有设定挑战哦</div>
+                    <button style={S.cfmBtn} onClick={()=>setMcForm({title:"",target:10})}>设定本月目标 🌟</button>
+                  </div>
+                ) : (()=>{
+                  const pct=Math.min(100,(mc.count/mc.target)*100);
+                  const today=todayKey();
+                  const doneToday=(mc.checkedDates||[]).includes(today);
+                  return(
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                        <span style={{flex:1,fontSize:13,fontWeight:800,color:"#3D2B1F"}}>{mc.title}</span>
+                        <span style={{fontSize:12,fontWeight:800,color:mc.achieved?"#5BAF5F":"#B09070"}}>{mc.count}/{mc.target}</span>
+                      </div>
+                      <div style={{height:6,background:"#FFF0D4",borderRadius:3,overflow:"hidden",marginBottom:12}}>
+                        <div style={{height:"100%",borderRadius:3,background:mc.achieved?"linear-gradient(90deg,#7BC67E,#5BAF5F)":"linear-gradient(90deg,#FFD166,#FFA940)",width:`${pct}%`,transition:"width .4s"}}/>
+                      </div>
+                      <button
+                        style={{...S.dBtn,width:"100%",...(doneToday?{background:"#FFD166",color:"#7A4A00"}:{})}}
+                        onClick={toggleMonthlyChallenge}
+                      >{doneToday?"✓ 今日已打卡（点击取消）":"🌟 今日打卡"}</button>
+                      {mc.achieved&&<div style={{textAlign:"center",fontSize:11,color:"#5BAF5F",fontWeight:700,marginTop:8}}>🎉 本月挑战已达成！</div>}
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
           </>
         )}
 
@@ -2830,6 +2938,21 @@ function App(){
         <Drawer onClose={()=>{setModal(null);setHabEdit(null);}}>
           <HabitEditor habit={habEdit} longStats={s.longStats} shortStats={s.shortStats} onSave={saveHabit} onDelete={habEdit.id?()=>deleteHabit(habEdit.id):null}/>
         </Drawer>
+      )}
+
+      {/* 每月挑战设置弹窗 */}
+      {mcForm&&(
+        <div style={S.modalCenter} onClick={()=>setMcForm(null)}>
+          <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 22px",maxWidth:340,width:"92%",boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #EDD9A3"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:15,fontWeight:900,color:"#3D2B1F",marginBottom:4}}>🌟 设定本月目标</div>
+            <div style={{fontSize:11,color:"#B09070",marginBottom:16}}>设置后本月内不可修改，请仔细考虑哦</div>
+            <FL>挑战内容</FL>
+            <input style={S.inp} placeholder="例：读完一本书、每天冥想" value={mcForm.title} onChange={e=>setMcForm(p=>({...p,title:e.target.value}))}/>
+            <FL>目标次数（本月）</FL>
+            <input type="number" min="1" style={{...S.inp,width:90}} value={mcForm.target} onChange={e=>setMcForm(p=>({...p,target:e.target.value===""?"":Number(e.target.value)}))}/>
+            <button style={{...S.cfmBtn,marginTop:16}} onClick={()=>{setMonthlyChallenge(mcForm.title,mcForm.target);setMcForm(null);}}>确认设定 🌟</button>
+          </div>
+        </div>
       )}
     </div>
     </LangCtx.Provider>
