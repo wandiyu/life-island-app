@@ -1344,10 +1344,10 @@ function App(){
       ...ct,records:ct.records||[],
       reward:typeof ct.reward==="object"?ct.reward:{xp:ct.reward||1,long:{},short:{}},
     }));
-    // 检测卡死的计时状态：开始计时超过1小时仍未结束，很可能是页面被意外关闭/杀进程导致的遗留状态
+    // 检测卡死的计时状态：开始计时超过2小时仍未结束，很可能是页面被意外关闭/杀进程导致的遗留状态
     // 不自动清理（可能是真实的长时长任务），而是收集起来，加载完成后询问用户是否丢弃
     const staleCollectTimers=d.collectionTasks.filter(ct=>
-      ct.isTiming&&ct.startTime&&(Date.now()-ct.startTime)>3600000
+      ct.isTiming&&ct.startTime&&(Date.now()-ct.startTime)>7200000
     ).map(ct=>({id:ct.id,name:ct.name,startTime:ct.startTime}));
     // 迁移：把 localStorage 里的旧签到记录合并进 checkinDates
     for(let i=0;i<localStorage.length;i++){
@@ -2027,6 +2027,8 @@ function App(){
               const timing=!!ct.isTiming;
               const records=ct.records||[];
               const avgSec=records.length>0?Math.round(records.reduce((a,b)=>a+b,0)/records.length):null;
+              const maxSec=records.length>0?Math.max(...records):null;
+              const minSec=records.length>0?Math.min(...records):null;
               const fmt=sec=>{const m=Math.floor(sec/60),s2=sec%60;return m>0?`${m}分${s2}秒`:`${s2}秒`;};
               const r=typeof ct.reward==="object"?ct.reward:{xp:ct.reward||1,long:{},short:{}};
               return(
@@ -2038,6 +2040,7 @@ function App(){
                       <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(r,s.longStats,s.shortStats)}</div>
                       <div style={{fontSize:11,color:"#B09070",marginTop:3}}>
                         已记录 {records.length} 次{avgSec!=null&&` · 平均 ${fmt(avgSec)}`}
+                        {records.length>1&&` · 最长 ${fmt(maxSec)} · 最短 ${fmt(minSec)}`}
                       </div>
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
