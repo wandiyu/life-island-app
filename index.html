@@ -157,7 +157,7 @@
     @keyframes giftBounce { 0%,100%{transform:scale(1) rotate(-1deg)} 30%{transform:scale(1.12) rotate(2deg)} 60%{transform:scale(0.96) rotate(-1deg)} }
     @keyframes fwShoot  { 0%{transform:translateY(0) scaleY(1);opacity:1} 60%{transform:translateY(-220px) scaleY(1.2);opacity:1} 100%{transform:translateY(-260px) scaleY(.6);opacity:0} }
     @keyframes fwBurst  { 0%{transform:translate(0,0) scale(0);opacity:1} 70%{opacity:1} 100%{transform:translate(var(--tx),var(--ty)) scale(1);opacity:0} }
-    @keyframes fwFade   { 0%,60%{opacity:1} 100%{opacity:0} }
+    @keyframes fwFade   { 0%,90%{opacity:1} 100%{opacity:0} }
 
     /* scrollbar */
     ::-webkit-scrollbar { width:4px; }
@@ -565,6 +565,7 @@ const INIT={
   habits:        DEF_HABITS,
   checkedHabits: {},
   habitAppliedShort: {},  // dateKey → {habitId: {statKey: actualDelta}} 记录打卡时实际生效的短期属性增量（用于精确撤销，避免clamp导致的数值漂移）
+  allDoneAwardedDates: [], // dateKey[] 记录哪些日期已经领取过"今日全部打卡完成"的额外+10🌸奖励，取消打卡导致不再全部完成时据此精确收回
   mainQuests:[
     {id:1,title:"建立稳定收入来源",desc:"副业或主业的突破",      reward:{xp:20,long:{wealth:10}},done:false},
     {id:2,title:"养成运动习惯",    desc:"每周锻炼3次，坚持3个月",reward:{xp:20,long:{health:8}}, done:false},
@@ -1355,6 +1356,7 @@ function App(){
     if(!Array.isArray(d.habits))      d.habits=DEF_HABITS;
     if(!d.checkedHabits)              d.checkedHabits={};
     if(!d.habitAppliedShort)          d.habitAppliedShort={};
+    if(!d.allDoneAwardedDates)        d.allDoneAwardedDates=[];
     if(!d.recurringQuests)            d.recurringQuests=INIT.recurringQuests;
     if(!d.rescueList)                 d.rescueList=DEF_RESCUE;
     else{const existing=new Set(d.rescueList);const added=DEF_RESCUE.filter(x=>!existing.has(x));if(added.length)d.rescueList=[...d.rescueList,...added];}
@@ -1652,6 +1654,8 @@ function App(){
     const h=s.habits.find(x=>x.id===hid);if(!h)return;
     let ns={...s,checkedHabits:{...s.checkedHabits,[today]:{...th,[hid]:!was}}};
     const todayApplied=s.habitAppliedShort?.[today]||{};
+    const awardedDates=s.allDoneAwardedDates||[];
+    const alreadyAwarded=awardedDates.includes(today);
     if(!was){
       // Apply short stats (capped 0~100, supports negative bonus)
       // 记录实际生效的增量（被clamp截断后的真实差值），供撤销时精确回退
@@ -1669,11 +1673,12 @@ function App(){
       ns.habitAppliedShort={...s.habitAppliedShort,[today]:{...todayApplied,[hid]:applied}};
       // +1 flower (xp)
       ns.player={...ns.player,xp:ns.player.xp+1};
-      // 检测今日全部完成
+      // 检测今日全部完成：只有"今天还没领过"才发放额外奖励，避免取消再打卡时重复触发
       const newTh={...th,[hid]:true};
       const allDone=s.habits.length>0&&s.habits.every(x=>newTh[x.id]);
-      if(allDone){
+      if(allDone&&!alreadyAwarded){
         ns.player={...ns.player,xp:ns.player.xp+10};
+        ns.allDoneAwardedDates=[...awardedDates,today];
         setTimeout(()=>setShowFirework(true),100);
         pop(randPick(ALLDONE_TOASTS));
       } else {
@@ -1692,7 +1697,15 @@ function App(){
       const restApplied={...todayApplied};delete restApplied[hid];
       ns.habitAppliedShort={...s.habitAppliedShort,[today]:restApplied};
       // -1 flower
-      ns.player={...ns.player,xp:Math.max(0,ns.player.xp-1)};
+      let newXp=Math.max(0,ns.player.xp-1);
+      // 检测取消后是否破坏了"今日全部完成"：如果今天已经领过额外奖励，但取消这一个后不再全部完成，需要精确收回那10🌸
+      const newTh={...th,[hid]:false};
+      const stillAllDone=s.habits.length>0&&s.habits.every(x=>newTh[x.id]);
+      if(alreadyAwarded&&!stillAllDone){
+        newXp=Math.max(0,newXp-10);
+        ns.allDoneAwardedDates=awardedDates.filter(d=>d!==today);
+      }
+      ns.player={...ns.player,xp:newXp};
     }
     save(ns);
   };
@@ -2954,6 +2967,9 @@ function App(){
           </div>
         </div>
       )}
+
+      {/* 采集任务计时悬浮窗：全局显示，不受当前tab影响 */}
+      <CollectTimerWidget tasks={(s.collectionTasks||[]).filter(ct=>ct.isTiming&&ct.startTime)} onStop={stopCollect}/>
     </div>
     </LangCtx.Provider>
   );
@@ -3735,16 +3751,15 @@ function BadgeCollection({badges}){
 
 // ─── firework ────────────────────────────────────────────
 const FW_COLORS=["#a7c957","#7fa832","#FFD166","#FF9A5C","#70B8E0","#FFB3C6","#8B5CF6","#fff"];
-function Firework({onDone}){
-  const t=useT();
-  const particles=useMemo(()=>{
-    const rockets=[
-      {x:20,color:"#a7c957"},{x:50,color:"#FFD166"},{x:80,color:"#FF9A5C"},
-      {x:35,color:"#70B8E0"},{x:65,color:"#8B5CF6"},
-    ];
-    return rockets.map((r,ri)=>({
-      ...r,
-      delay:ri*0.15,
+// 生成一轮烟花的随机数据（5个火箭，随机位置/颜色，每个炸开16个粒子）
+const genFireworkRound=()=>{
+  const palette=["#a7c957","#FFD166","#FF9A5C","#70B8E0","#8B5CF6","#7BC67E","#FF6B9D"];
+  const positions=[15,30,45,60,75,90].sort(()=>Math.random()-.5).slice(0,5);
+  return positions.map((x,ri)=>{
+    const color=palette[Math.floor(Math.random()*palette.length)];
+    const delay=ri*0.15;
+    return{
+      x,color,delay,
       bursts:Array.from({length:16},(_,i)=>{
         const angle=(i/16)*Math.PI*2;
         const dist=55+Math.random()*40;
@@ -3753,26 +3768,76 @@ function Firework({onDone}){
           ty:Math.round(Math.sin(angle)*dist),
           color:FW_COLORS[Math.floor(Math.random()*FW_COLORS.length)],
           size:4+Math.random()*4,
-          delay:r.delay+0.55+Math.random()*0.1,
+          delay:delay+0.55+Math.random()*0.1,
         };
       }),
-    }));
+    };
+  });
+};
+// 全局悬浮：显示所有正在计时中的采集任务，支持多个堆叠，可直接点击"结束"
+function CollectTimerWidget({tasks,onStop}){
+  const [now,setNow]=useState(Date.now());
+  useEffect(()=>{
+    const timer=setInterval(()=>setNow(Date.now()),1000);
+    return()=>clearInterval(timer);
   },[]);
+  if(!tasks||tasks.length===0) return null;
+  const fmt=sec=>{const m=Math.floor(sec/60),s2=sec%60;return `${String(m).padStart(2,"0")}:${String(s2).padStart(2,"0")}`;};
+  return(
+    <div style={{position:"fixed",left:12,right:12,bottom:"calc(16px + env(safe-area-inset-bottom))",zIndex:140,display:"flex",flexDirection:"column",gap:8,pointerEvents:"none"}}>
+      {tasks.map(ct=>{
+        const elapsed=Math.max(0,Math.floor((now-ct.startTime)/1000));
+        return(
+          <div key={ct.id} style={{
+            pointerEvents:"auto",background:"rgba(61,43,31,.92)",borderRadius:18,padding:"10px 10px 10px 16px",
+            display:"flex",alignItems:"center",gap:10,boxShadow:"0 6px 20px rgba(0,0,0,.25)",
+            backdropFilter:"blur(6px)",border:"1.5px solid rgba(255,255,255,.12)",
+          }}>
+            <span style={{fontSize:16,flexShrink:0}}>🍏</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,color:"#fff",fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ct.name}</div>
+              <div style={{fontSize:14,color:"#FFD166",fontWeight:900,fontFamily:"monospace",letterSpacing:.5}}>{fmt(elapsed)}</div>
+            </div>
+            <button onClick={()=>onStop(ct.id)} style={{
+              flexShrink:0,background:"#FFD166",color:"#7A4A00",border:"none",borderRadius:14,
+              padding:"8px 16px",fontSize:13,fontWeight:800,cursor:"pointer",
+            }}>结束</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+const FIREWORK_DURATION=10000; // 整体展示时长（毫秒）
+const FIREWORK_ROUND_INTERVAL=2500; // 每隔多久放一轮新烟花
+function Firework({onDone}){
+  const t=useT();
+  const [round,setRound]=useState(0); // 轮次序号，用作key强制重新渲染触发CSS动画重播
+  const [particles,setParticles]=useState(()=>genFireworkRound());
+  const [toast]=useState(()=>randPick(ALLDONE_TOASTS)); // 台词只在挂载时随机一次，不随每轮烟花重新渲染而改变
 
-  useEffect(()=>{const t=setTimeout(onDone,3200);return()=>clearTimeout(t);},[]);
+  useEffect(()=>{
+    const endTimer=setTimeout(onDone,FIREWORK_DURATION);
+    // 周期性触发新一轮烟花，最后一轮要留出完整播放时间，不在临近结束时突然打断
+    const roundTimer=setInterval(()=>{
+      setParticles(genFireworkRound());
+      setRound(r=>r+1);
+    },FIREWORK_ROUND_INTERVAL);
+    return()=>{clearTimeout(endTimer);clearInterval(roundTimer);};
+  },[]);
 
   return(
     <div style={{position:"fixed",inset:0,zIndex:300,pointerEvents:"none",overflow:"hidden"}} onClick={onDone}>
       {/* 半透明遮罩 */}
-      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)",animation:"fwFade 3s ease forwards"}}/>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)",animation:"fwFade 10s ease forwards"}}/>
       {/* 中央提示 */}
-      <div style={{position:"absolute",top:"38%",left:"50%",transform:"translateX(-50%)",textAlign:"center",animation:"fwFade 3s ease forwards"}}>
+      <div style={{position:"absolute",top:"38%",left:"50%",transform:"translateX(-50%)",textAlign:"center",animation:"fwFade 10s ease forwards"}}>
         <div style={{fontSize:52,lineHeight:1,marginBottom:8,animation:"badgePop .4s cubic-bezier(.34,1.56,.64,1)"}}>🎉</div>
-        <div style={{fontSize:20,fontWeight:900,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,.4)",letterSpacing:.5,padding:"0 20px"}}>{randPick(ALLDONE_TOASTS)}</div>
+        <div style={{fontSize:20,fontWeight:900,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,.4)",letterSpacing:.5,padding:"0 20px"}}>{toast}</div>
       </div>
-      {/* 烟花 */}
+      {/* 烟花：key包含round，每轮重新mount以重播CSS动画 */}
       {particles.map((r,ri)=>(
-        <div key={ri} style={{position:"absolute",bottom:0,left:`${r.x}%`}}>
+        <div key={`${round}-${ri}`} style={{position:"absolute",bottom:0,left:`${r.x}%`}}>
           {/* 升空轨迹 */}
           <div style={{
             width:4,height:18,borderRadius:2,background:r.color,
