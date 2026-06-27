@@ -2281,13 +2281,30 @@ function App(){
 
         {/* ── 工具 ── */}
         {tab==="tools"&&<>
+          {/* 快速电梯 */}
+          <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+            {[["tool-draw","🎲"],["tool-timer","⏳"],["tool-puzzle","🧩"]].map(([id,label])=>(
+              <button key={id} onClick={()=>{
+                  const el=document.getElementById(id);
+                  if(!el)return;
+                  const y=el.getBoundingClientRect().top+window.scrollY-105;
+                  window.scrollTo({top:y,behavior:"smooth"});
+                }}
+                style={{flex:1,fontSize:17,fontWeight:700,color:"#5BAF5F",background:"none",border:"none",borderRadius:10,padding:"3px 4px",cursor:"pointer"}}>
+                {label}
+              </button>
+            ))}
+          </div>
+
           {/* 🎲 抽签 */}
+          <div id="tool-draw">
           <ACCard title={t("🎲 抽签","🎲 Draw")}>
             <div style={{padding:"6px 0"}}>
               <div style={{fontSize:12,color:"#B09070",marginBottom:12}}>拿不定主意？让概率之神帮你决定吧</div>
               <button style={{...S.cfmBtn,width:"100%"}} onClick={()=>setModal("draw")}>开始抽签 🎲</button>
             </div>
           </ACCard>
+          </div>
 
           {/* ⏳ 计时器（原采集任务） */}
           <div id="tool-timer">
