@@ -397,6 +397,13 @@ const DEF_HABITS=[
 ];
 const DEF_RESCUE=["去运动一下","弹尤克里里","冥想10分钟","出门散散步","喝杯热茶","写写画画","瑜伽","box呼吸法",
 "按摩手指","整理桌子","整理文件夹","闭上眼睛听音乐","看看周围环境","躺五分钟","手表reflect","手表呼吸训练","闭上眼睛摸周围的东西"];
+// 🧩 拼图思考工具的四个字段定义：[字段key, 展示label, 输入框placeholder]，新建/编辑/卡片展示统一从这里取
+const PUZZLE_FIELDS=[
+  ["goal","目标","我想达成什么"],
+  ["blocker","卡点","我目前在等什么"],
+  ["blindSpot","盲区","这个等待解决不了什么问题"],
+  ["action","行动","我现在能做什么"],
+];
 
 const FISH_LIST=[
   {emoji:"🐠",name:"小丑鱼"},{emoji:"🐡",name:"河豚"},{emoji:"🦈",name:"鲨鱼宝宝"},
@@ -603,6 +610,7 @@ const INIT={
   checkinDates: {},
   collectionTasks: [],
   monthlyChallenge: {}, // monthKey("2026-6") → {title, target, count, achieved, checkedDates:[dateKey]} 每月只能设置一次目标，设置后title/target锁定不可改
+  puzzleTools: [], // {id, goal, blocker, blindSpot, action, status:"active"} 拼图思考工具，存档后会从此数组移除并写入岛上新闻
 };
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
@@ -800,7 +808,7 @@ const Leaf=({x,y,r=0,s=1,c="#7BC67E"})=>(
 );
 
 // AC-style header cloud/hill SVG
-function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift,onBadge,onDraw,shortStats,onStatChange,onToggleHabit,monthlyChallenge,onToggleMonthlyChallenge,onMonthlyChallengeUnsetClick}){
+function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habits,th,onGear,onGift,onBadge,shortStats,onStatChange,onToggleHabit,monthlyChallenge,onToggleMonthlyChallenge,onMonthlyChallengeUnsetClick}){
   const t=useT();
   const hour=new Date().getHours();
 
@@ -916,17 +924,6 @@ function HeaderScene({playerName,level,xpPct,xp,xpNext,doneCnt,totalHabits,habit
               <line x1="12" y1="8" x2="12" y2="21"/>
               <path d="M12 8C12 8 9 8 9 5.5C9 4 10 3 11.5 3C13 3 12 5 12 8Z"/>
               <path d="M12 8C12 8 15 8 15 5.5C15 4 14 3 12.5 3C11 3 12 5 12 8Z"/>
-            </svg>
-          </button>
-          <button onClick={onDraw} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.55)",border:"2px solid rgba(255,255,255,.8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",backdropFilter:"blur(4px)"}}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#5BAF5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="4"/>
-              <circle cx="8" cy="7.5" r="1.2" fill="#5BAF5F" stroke="none"/>
-              <circle cx="16" cy="7.5" r="1.2" fill="#5BAF5F" stroke="none"/>
-              <circle cx="8" cy="12" r="1.2" fill="#5BAF5F" stroke="none"/>
-              <circle cx="16" cy="12" r="1.2" fill="#5BAF5F" stroke="none"/>
-              <circle cx="8" cy="16.5" r="1.2" fill="#5BAF5F" stroke="none"/>
-              <circle cx="16" cy="16.5" r="1.2" fill="#5BAF5F" stroke="none"/>
             </svg>
           </button>
           <button onClick={onGear} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.55)",border:"2px solid rgba(255,255,255,.8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",backdropFilter:"blur(4px)"}}>
@@ -1136,7 +1133,7 @@ function CollapsibleRescueSection({s,save,pop}){
 function TagManageSection({s,save,pop}){
   const [open,setOpen]=useState(false);
   const [newTag,setNewTag]=useState("");
-  const FUNC=["任务","签到","座右铭","抽签"]; // 功能性标签不可删除，但可排序
+  const FUNC=["任务","签到","座右铭","抽签","拼图"]; // 功能性标签不可删除，但可排序
 
   // 系统标签始终排在最前面（按 FUNC 内部顺序），其余标签保持用户排序
   const tags=useMemo(()=>{
@@ -1297,7 +1294,10 @@ function App(){
   const [nicknameFishIdx, setNicknameFishIdx]  = useState(null);
   const [ceremonyNick,    setCeremonyNick]     = useState("");
   const [stepCapQuest,    setStepCapQuest]     = useState(null);
-  const [colForm,         setColForm]          = useState({name:"",reward:1});
+  const [colForm,         setColForm]          = useState(null); // 计时器新增表单 {title,desc,xp,long,short}，null=未打开
+  const [puzForm,         setPuzForm]           = useState(null); // 拼图新建表单 {goal,blocker,blindSpot,action}，null=未打开
+  const [puzEditField,    setPuzEditField]      = useState(null); // 拼图单字段编辑 {id,field,value}，null=未打开
+  const [puzExpanded,     setPuzExpanded]        = useState({}); // {puzzleId: true} 记录哪些拼图卡片当前展开了"卡点/盲区/行动"，纯UI状态不持久化
   const [staleTimers,     setStaleTimers]       = useState([]); // 加载时检测到超过1小时仍在计时的采集任务，等待用户确认是否丢弃
   const [mcForm,          setMcForm]             = useState(null); // 每月挑战设置弹窗表单 {title,target}，null=未打开
   const [drawQuestion,    setDrawQuestion]     = useState("");
@@ -1367,6 +1367,7 @@ function App(){
     if(!d.checkinDates)               d.checkinDates={};
     if(!d.collectionTasks)            d.collectionTasks=[];
     if(!d.monthlyChallenge)           d.monthlyChallenge={};
+    if(!d.puzzleTools)                d.puzzleTools=[];
     // 字段兜底：确保 records/reward 结构完整（不清理 isTiming，避免误杀正常进行中的计时）
     d.collectionTasks=d.collectionTasks.map(ct=>({
       ...ct,records:ct.records||[],
@@ -1501,10 +1502,12 @@ function App(){
     if(s&&s.pendingWeeklyResult){setShowWeeklyResult(true);}
   },[s?.pendingWeeklyResult]);
 
+  // 升级所需经验：lv<9 时下一级需要100xp（1→2...8→9），lv>=9 起每级需要200xp（9→10起）
+  const xpNeededFor=lv=>lv<9?100:200;
   const lvUp=(xp,lv,xpN,badges)=>{
     let nb=[...(badges||[])],latest=null;
-    while(xp>=xpN){lv++;xp-=xpN;xpN=100;const badge=grantBadge(lv,nb);nb.push(badge);latest=badge;}
-    return{xp,lv,xpN:100,newBadges:nb,latestBadge:latest};
+    while(xp>=xpN){lv++;xp-=xpN;xpN=xpNeededFor(lv);const badge=grantBadge(lv,nb);nb.push(badge);latest=badge;}
+    return{xp,lv,xpN,newBadges:nb,latestBadge:latest};
   };
 
   // ─── 统一奖励结算 ───
@@ -1718,15 +1721,6 @@ function App(){
   const deleteHabit=id=>{save({...s,habits:s.habits.filter(h=>h.id!==id)});setModal(null);setHabEdit(null);pop("🗑️ 已删除");};
   const saveQuest=()=>{
     if(!qForm.title.trim())return;
-    if(qForm.type==="collect"){
-      const reward={xp:Number(qForm.xp)||1,long:{...qForm.long},short:{...qForm.short}};
-      Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
-      Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
-      const newCt={id:"col_"+Date.now(),name:qForm.title.trim(),desc:qForm.desc,reward,records:[],isTiming:false,startTime:null};
-      save({...s,collectionTasks:[...(s.collectionTasks||[]),newCt]});
-      setModal(null);setQForm(null);pop(`🍏 已添加「${newCt.name}」`);
-      return;
-    }
     const reward={xp:Number(qForm.xp)||10,long:{...qForm.long},short:{...qForm.short}};
     Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
     Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
@@ -1737,6 +1731,49 @@ function App(){
       save({...s,mainQuests:qForm.type==="main"?[...s.mainQuests,q]:s.mainQuests,sideQuests:qForm.type==="side"?[...s.sideQuests,q]:s.sideQuests});
     }
     setModal(null);setQForm(null);pop("📜 任务已接取");
+  };
+  // 新增计时器（原"采集任务"）：与任务新增表单解绑，独立的表单状态colForm和独立的保存逻辑
+  const saveColTimer=()=>{
+    if(!colForm.title.trim())return;
+    const reward={xp:Number(colForm.xp)||1,long:{...colForm.long},short:{...colForm.short}};
+    Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
+    Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
+    const newCt={id:"col_"+Date.now(),name:colForm.title.trim(),desc:colForm.desc,reward,records:[],isTiming:false,startTime:null};
+    save({...s,collectionTasks:[...(s.collectionTasks||[]),newCt]});
+    setColForm(null);pop(`⏳ 已添加「${newCt.name}」`);
+  };
+  // ─── 🧩 拼图思考工具 ───
+  // 新建：四个字段必填才能保存
+  const savePuzzle=()=>{
+    const{goal,blocker,blindSpot,action}=puzForm;
+    if(!goal.trim()||!blocker.trim()||!blindSpot.trim()||!action.trim())return;
+    const np={id:"puz_"+Date.now(),goal:goal.trim(),blocker:blocker.trim(),blindSpot:blindSpot.trim(),action:action.trim(),status:"active"};
+    save({...s,puzzleTools:[...(s.puzzleTools||[]),np]});
+    setPuzForm(null);pop("🧩 拼图已建立");
+  };
+  // 编辑：单独修改某个拼图的某一个字段
+  const savePuzzleField=()=>{
+    const{id,field,value}=puzEditField;
+    if(!value.trim())return; // 编辑后依然要求非空，保持与新建一致的"四项必填"约束
+    save({...s,puzzleTools:(s.puzzleTools||[]).map(p=>p.id===id?{...p,[field]:value.trim()}:p)});
+    setPuzEditField(null);
+  };
+  // 存档：生成岛上新闻（tag=拼图）+ 1🌸奖励 + 从活跃列表移除
+  const archivePuzzle=id=>{
+    const pz=(s.puzzleTools||[]).find(p=>p.id===id);if(!pz)return;
+    const existingTags=s.eventTags||[];
+    const newTags=existingTags.includes("拼图")?existingTags:[...existingTags,"拼图"];
+    const text=`目标：${pz.goal}\n卡点：${pz.blocker}\n盲区：${pz.blindSpot}\n行动：${pz.action}`;
+    const ev={id:Date.now(),date:todayKey(),text,xp:1,statChanges:{},tag:"拼图"};
+    const{player,badges,longStats,shortStats,didLevelUp,latestBadge}=grantReward({xp:1},{longOverflow:true});
+    if(!didLevelUp) pop("🧩 拼图已存档 +1 🌸");
+    else if(latestBadge) setNewBadge(latestBadge);
+    save({...s,player,badges,longStats,shortStats,
+      bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),
+      eventTags:newTags,
+      puzzleTools:(s.puzzleTools||[]).filter(p=>p.id!==id),
+    });
+    setPuzExpanded(p=>{const n={...p};delete n[id];return n;});
   };
   const saveBigEvent=()=>{
     if(!evForm.text.trim())return;
@@ -1781,7 +1818,7 @@ function App(){
   const badges=s.badges||[];
 
   const t=useT();
-  const TABS=[["home","🏝️",t("岛况","Home")],["quests","🌴",t("任务","Quests")],["habits","🐳",t("打卡","Check-in")],["log","🎨",t("岛记","Log")]];
+  const TABS=[["home","🏝️",t("岛况","Home")],["quests","🌴",t("任务","Quests")],["habits","🐳",t("打卡","Check-in")],["tools","🛶",t("工具","Tools")],["log","🎨",t("岛记","Log")]];
 
   const toggleLang=()=>{const nl=lang==="zh"?"en":"zh";setLangState(nl);setLang(nl);};
   return(
@@ -1847,7 +1884,7 @@ function App(){
         return(
           <div style={S.modalCenter}>
             <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 22px",maxWidth:320,width:"92%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.25)",border:"3px solid #FFD166"}}>
-              <div style={{fontSize:26,marginBottom:8}}>⏱️</div>
+              <div style={{fontSize:26,marginBottom:8}}>⏳</div>
               <div style={{fontSize:15,fontWeight:900,color:"#3D2B1F",marginBottom:8}}>「{cur.name}」还在计时</div>
               <div style={{fontSize:13,color:"#7A5C44",marginBottom:18,lineHeight:1.5}}>
                 已经过去 {hrs} 小时了，可能是上次忘记点击"结束"，或是页面被意外关闭。<br/>要保留这次记录继续计时，还是丢弃重新开始？
@@ -1913,7 +1950,6 @@ function App(){
         th={th}
         onGear={()=>setShowSettings(true)}
         onGift={()=>setModal("rescue")}
-        onDraw={()=>setModal("draw")}
         onBadge={()=>setModal("badges")}
         shortStats={s.shortStats}
         onStatChange={(k,delta)=>{setEvForm({text:"",xp:1,changes:{[k]:delta}});setModal("bigEvent");}}
@@ -2018,7 +2054,7 @@ function App(){
         {tab==="quests"&&<>
           {/* 快速电梯 */}
           <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-            {[["q-main","🌵"],["q-side","🌳"],["q-recurring","💦"],["q-collect","🍏"]].map(([id,label])=>(
+            {[["q-main","🌵"],["q-side","🌳"],["q-recurring","💦"]].map(([id,label])=>(
               <button key={id} onClick={()=>{
                   const el=document.getElementById(id);
                   if(!el)return;
@@ -2103,46 +2139,6 @@ function App(){
           </ACCard>
           </div>
 
-          {/* 采集任务 */}
-          <div id="q-collect">
-          <ACCard title={t("🍏 采集任务","🍏 Collect")} action={<button style={S.plusBtn} onClick={()=>{setQForm({type:"collect",title:"",desc:"",xp:1,period:"weekly",long:{},short:{}});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
-            {(s.collectionTasks||[]).length===0&&<div style={S.empty}>添加一个采集任务，记录每次用时吧 🍏</div>}
-            {(s.collectionTasks||[]).map(ct=>{
-              const timing=!!ct.isTiming;
-              const records=ct.records||[];
-              const avgSec=records.length>0?Math.round(records.reduce((a,b)=>a+b,0)/records.length):null;
-              const maxSec=records.length>0?Math.max(...records):null;
-              const minSec=records.length>0?Math.min(...records):null;
-              const fmt=sec=>{const m=Math.floor(sec/60),s2=sec%60;return m>0?`${m}分${s2}秒`:`${s2}秒`;};
-              const r=typeof ct.reward==="object"?ct.reward:{xp:ct.reward||1,long:{},short:{}};
-              return(
-                <div key={ct.id} style={{padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
-                  <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>🍏 {ct.name}</div>
-                      {ct.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{ct.desc}</div>}
-                      <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(r,s.longStats,s.shortStats)}</div>
-                      <div style={{fontSize:11,color:"#B09070",marginTop:3}}>
-                        已记录 {records.length} 次{avgSec!=null&&` · 平均 ${fmt(avgSec)}`}
-                        {records.length>1&&` · 最长 ${fmt(maxSec)} · 最短 ${fmt(minSec)}`}
-                      </div>
-                    </div>
-                    <div style={{display:"flex",gap:6,flexShrink:0}}>
-                      {timing
-                        ?<button style={{...S.dBtn,background:"#FFD166",color:"#7A4A00"}} onClick={()=>stopCollect(ct.id)}>结束</button>
-                        :<button style={S.dBtn} onClick={()=>startCollect(ct.id)}>开始</button>
-                      }
-                      <button style={S.xBtn} onClick={()=>deleteCollect(ct.id)}>🗑</button>
-                    </div>
-                  </div>
-                  {timing&&(
-                    <div style={{marginTop:8,fontSize:11,color:"#A06000",fontWeight:700}}>⏳ 计时中…</div>
-                  )}
-                </div>
-              );
-            })}
-          </ACCard>
-          </div>
         </>}
 
         {/* ── 打卡 ── */}
@@ -2282,6 +2278,101 @@ function App(){
           })()}
           </>
         )}
+
+        {/* ── 工具 ── */}
+        {tab==="tools"&&<>
+          {/* 🎲 抽签 */}
+          <ACCard title={t("🎲 抽签","🎲 Draw")}>
+            <div style={{padding:"6px 0"}}>
+              <div style={{fontSize:12,color:"#B09070",marginBottom:12}}>拿不定主意？让概率之神帮你决定吧</div>
+              <button style={{...S.cfmBtn,width:"100%"}} onClick={()=>setModal("draw")}>开始抽签 🎲</button>
+            </div>
+          </ACCard>
+
+          {/* ⏳ 计时器（原采集任务） */}
+          <div id="tool-timer">
+          <ACCard title={t("⏳ 计时器","⏳ Timer")} action={<button style={S.plusBtn} onClick={()=>setColForm({title:"",desc:"",xp:1,long:{},short:{}})}>{t("＋ 新增","＋ Add")}</button>}>
+            {(s.collectionTasks||[]).length===0&&<div style={S.empty}>添加一个计时器，记录每次用时吧 ⏳</div>}
+            {(s.collectionTasks||[]).map(ct=>{
+              const timing=!!ct.isTiming;
+              const records=ct.records||[];
+              const avgSec=records.length>0?Math.round(records.reduce((a,b)=>a+b,0)/records.length):null;
+              const maxSec=records.length>0?Math.max(...records):null;
+              const minSec=records.length>0?Math.min(...records):null;
+              const fmt=sec=>{const m=Math.floor(sec/60),s2=sec%60;return m>0?`${m}分${s2}秒`:`${s2}秒`;};
+              const r=typeof ct.reward==="object"?ct.reward:{xp:ct.reward||1,long:{},short:{}};
+              return(
+                <div key={ct.id} style={{padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>⏳ {ct.name}</div>
+                      {ct.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{ct.desc}</div>}
+                      <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(r,s.longStats,s.shortStats)}</div>
+                      <div style={{fontSize:11,color:"#B09070",marginTop:3}}>
+                        已记录 {records.length} 次{avgSec!=null&&` · 平均 ${fmt(avgSec)}`}
+                        {records.length>1&&` · 最长 ${fmt(maxSec)} · 最短 ${fmt(minSec)}`}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      {timing
+                        ?<button style={{...S.dBtn,background:"#FFD166",color:"#7A4A00"}} onClick={()=>stopCollect(ct.id)}>结束</button>
+                        :<button style={S.dBtn} onClick={()=>startCollect(ct.id)}>开始</button>
+                      }
+                      <button style={S.xBtn} onClick={()=>deleteCollect(ct.id)}>🗑</button>
+                    </div>
+                  </div>
+                  {timing&&(
+                    <div style={{marginTop:8,fontSize:11,color:"#A06000",fontWeight:700}}>⏳ 计时中…</div>
+                  )}
+                </div>
+              );
+            })}
+          </ACCard>
+          </div>
+
+          {/* 🧩 拼图思考工具 */}
+          <div id="tool-puzzle">
+          <ACCard title={t("🧩 拼图","🧩 Puzzle")} action={<button style={S.plusBtn} onClick={()=>setPuzForm({goal:"",blocker:"",blindSpot:"",action:""})}>{t("＋ 新增","＋ Add")}</button>}>
+            {(s.puzzleTools||[]).length===0&&<div style={S.empty}>遇到难题时，把它拼成四块试试看 🧩</div>}
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {(s.puzzleTools||[]).map(pz=>{
+              const expanded=!!puzExpanded[pz.id];
+              const[firstField,...restFields]=PUZZLE_FIELDS;
+              const[fField,fLabel]=firstField;
+              return(
+                <div key={pz.id} style={{borderRadius:16,border:"2px solid #EDD9A3",background:"#FFFDF5",boxShadow:"0 3px 12px rgba(90,60,30,.06)",overflow:"hidden"}}>
+                  {/* 头部：目标 + 展开箭头，整行占满，永远可见 */}
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 10px 10px 14px"}}>
+                    <div onClick={()=>setPuzEditField({id:pz.id,field:fField,value:pz[fField]})} style={{flex:1,cursor:"pointer",minWidth:0}}>
+                      <div style={{fontSize:10,color:"#7BC67E",fontWeight:800,marginBottom:2}}>{fLabel}</div>
+                      <div style={{fontSize:14,fontWeight:700,color:"#3D2B1F",lineHeight:1.5}}>{pz[fField]}</div>
+                    </div>
+                    <button onClick={()=>setPuzExpanded(p=>({...p,[pz.id]:!expanded}))}
+                      style={{flexShrink:0,width:30,height:30,borderRadius:"50%",background:"#F0FFF0",border:"1.5px solid #C8E8C8",cursor:"pointer",fontSize:15,color:"#5BAF5F",display:"flex",alignItems:"center",justifyContent:"center",transform:expanded?"rotate(180deg)":"none",transition:"transform .2s"}}>
+                      ▾
+                    </button>
+                  </div>
+                  {/* 展开区：卡点/盲区/行动 + 存档按钮，与头部相同内边距对齐 */}
+                  {expanded&&(
+                    <div style={{padding:"0 14px 12px",borderTop:"1.5px dashed #EDD9A3"}}>
+                      {restFields.map(([field,label])=>(
+                        <div key={field}
+                          onClick={()=>setPuzEditField({id:pz.id,field,value:pz[field]})}
+                          style={{marginTop:10,cursor:"pointer"}}>
+                          <div style={{fontSize:10,color:"#7BC67E",fontWeight:800,marginBottom:2}}>{label}</div>
+                          <div style={{fontSize:14,fontWeight:700,color:"#3D2B1F",lineHeight:1.5}}>{pz[field]}</div>
+                        </div>
+                      ))}
+                      <button style={{...S.dBtn,width:"100%",marginTop:12}} onClick={()=>archivePuzzle(pz.id)}>📥 存档</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            </div>
+          </ACCard>
+          </div>
+        </>}
 
         {/* ── 记录 ── */}
         {tab==="log"&&<>
@@ -2873,7 +2964,7 @@ function App(){
         <Drawer onClose={()=>{setModal(null);setQForm(null);}}>
           <div style={S.dH}>{t("岛上新任务 🏝️","New Quest 🏝️")}</div>
           <div style={S.tog}>
-            {[["main",t("🌵 开荒主线","🌵 Pioneer")],["side",t("🌳 种树任务","🌳 Plant")],["recurring",t("💦 浇水任务","💦 Water")],["collect",t("🍏 采集任务","🍏 Collect")]].map(([t,l])=>(
+            {[["main",t("🌵 开荒主线","🌵 Pioneer")],["side",t("🌳 种树任务","🌳 Plant")],["recurring",t("💦 浇水任务","💦 Water")]].map(([t,l])=>(
               <button key={t} style={{...S.tBtn,...(qForm.type===t?S.tOn:{})}} onClick={()=>setQForm(p=>({...p,type:t}))}>{l}</button>
             ))}
           </div>
@@ -2883,7 +2974,7 @@ function App(){
             ))}
           </div>}
           <FL>任务名称</FL>
-          <input style={S.inp} placeholder={qForm.type==="collect"?"例：摸鱼、拔草、捡贝壳":"例：完成项目"} value={qForm.title} onChange={e=>setQForm(p=>({...p,title:e.target.value}))}/>
+          <input style={S.inp} placeholder="例：完成项目" value={qForm.title} onChange={e=>setQForm(p=>({...p,title:e.target.value}))}/>
           <FL>描述（可选）</FL>
           <input style={S.inp} placeholder="例：本月完成" value={qForm.desc} onChange={e=>setQForm(p=>({...p,desc:e.target.value}))}/>
           {qForm.type==="main"
@@ -2952,6 +3043,57 @@ function App(){
           <HabitEditor habit={habEdit} longStats={s.longStats} shortStats={s.shortStats} onSave={saveHabit} onDelete={habEdit.id?()=>deleteHabit(habEdit.id):null}/>
         </Drawer>
       )}
+
+      {/* 计时器新增表单：独立于任务新增弹窗 */}
+      {colForm&&(
+        <Drawer onClose={()=>setColForm(null)}>
+          <div style={S.dH}>{t("新建计时器 ⏳","New Timer ⏳")}</div>
+          <FL>计时器名称</FL>
+          <input style={S.inp} placeholder="例：摸鱼、拔草、捡贝壳" value={colForm.title} onChange={e=>setColForm(p=>({...p,title:e.target.value}))}/>
+          <FL>描述（可选）</FL>
+          <input style={S.inp} placeholder="例：每天傍晚" value={colForm.desc} onChange={e=>setColForm(p=>({...p,desc:e.target.value}))}/>
+          <FL>🌸 奖励</FL>
+          <input type="number" style={{...S.inp,width:90}} value={colForm.xp} onChange={e=>setColForm(p=>({...p,xp:e.target.value}))}/>
+          <FL>长期属性加成</FL>
+          <BonusRow stats={s.longStats} bonus={colForm.long} onChange={b=>setColForm(p=>({...p,long:b}))}/>
+          <FL>今日属性加成</FL>
+          <BonusRow stats={s.shortStats} bonus={colForm.short} onChange={b=>setColForm(p=>({...p,short:b}))}/>
+          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveColTimer}>确认建立 ⏳</button>
+        </Drawer>
+      )}
+
+      {/* 拼图新建表单 */}
+      {puzForm&&(
+        <Drawer onClose={()=>setPuzForm(null)}>
+          <div style={S.dH}>{t("新建拼图 🧩","New Puzzle 🧩")}</div>
+          <div style={{fontSize:11,color:"#B09070",marginBottom:8}}>四块都拼上，才能看清整张图</div>
+          {PUZZLE_FIELDS.map(([field,label,placeholder])=>(
+            <div key={field}>
+              <FL>{label}</FL>
+              <textarea style={{...S.inp,height:64,resize:"none",lineHeight:1.5}} placeholder={placeholder}
+                value={puzForm[field]} onChange={e=>setPuzForm(p=>({...p,[field]:e.target.value}))}/>
+            </div>
+          ))}
+          <button style={{...S.cfmBtn,marginTop:8}} onClick={savePuzzle}>确认拼上 🧩</button>
+        </Drawer>
+      )}
+
+      {/* 拼图单字段编辑 */}
+      {puzEditField&&(()=>{
+        const fieldInfo=PUZZLE_FIELDS.find(([f])=>f===puzEditField.field);
+        const label=fieldInfo?fieldInfo[1]:"";
+        const placeholder=fieldInfo?fieldInfo[2]:"";
+        return(
+          <div style={S.modalCenter} onClick={()=>setPuzEditField(null)}>
+            <div style={{background:"#FFFDF5",borderRadius:24,padding:"22px 20px",maxWidth:340,width:"92%",boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #EDD9A3"}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:14,fontWeight:900,color:"#3D2B1F",marginBottom:10}}>🧩 {label}</div>
+              <textarea style={{...S.inp,height:88,resize:"none",lineHeight:1.5}} placeholder={placeholder}
+                value={puzEditField.value} onChange={e=>setPuzEditField(p=>({...p,value:e.target.value}))}/>
+              <button style={{...S.cfmBtn,marginTop:8}} onClick={savePuzzleField}>保存</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 每月挑战设置弹窗 */}
       {mcForm&&(
@@ -3545,7 +3687,7 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
                 {selEvents.length>0&&(
                   <div style={{marginTop:4}}>
                     {selEvents.map(ev=>(
-                      <div key={ev.id} style={{padding:"8px 10px",borderRadius:12,background:"#FAFFF8",border:"1.5px dashed #C8E8C8",marginBottom:6,fontSize:13,color:"#3D2B1F",lineHeight:1.6}}>
+                      <div key={ev.id} style={{padding:"8px 10px",borderRadius:12,background:"#FAFFF8",border:"1.5px dashed #C8E8C8",marginBottom:6,fontSize:13,color:"#3D2B1F",lineHeight:1.6,whiteSpace:"pre-line"}}>
                         {ev.tag&&<span style={{fontSize:10,fontWeight:800,color:"#5BAF5F",marginRight:6}}>#{ev.tag}</span>}
                         {ev.text}
                       </div>
@@ -3618,7 +3760,7 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
         })()}
         {/* tag pills */}
         {(()=>{
-          const FUNC=["任务","签到","座右铭","抽签"];
+          const FUNC=["任务","签到","座右铭","抽签","拼图"];
           const sysInOrder=eventTags.filter(t=>FUNC.includes(t));
           const others=eventTags.filter(t=>!FUNC.includes(t));
           return[...sysInOrder,...others];
@@ -3662,7 +3804,7 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
               {ev.tag&&tc&&<span style={{fontSize:10,fontWeight:800,background:tc.bg,border:`1.5px solid ${tc.border}`,color:tc.text,borderRadius:14,padding:"2px 8px"}}>{ev.tag}</span>}
               <button onClick={()=>onEdit(ev)} style={{marginLeft:"auto",background:"none",border:"none",fontSize:13,cursor:"pointer",opacity:.5,padding:"0 2px"}}>✏️</button>
             </div>
-            <div style={{fontSize:13,color:"#3D2B1F",lineHeight:1.65,marginBottom:6}}>{ev.text}</div>
+            <div style={{fontSize:13,color:"#3D2B1F",lineHeight:1.65,marginBottom:6,whiteSpace:"pre-line"}}>{ev.text}</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
               {ev.xp>0&&<span style={{fontSize:11,fontWeight:700,background:"#F0FFF0",border:"1.5px solid #7BC67E",color:"#3A7D3E",borderRadius:20,padding:"3px 10px"}}>🌸+{ev.xp}</span>}
               {ev.statChanges&&Object.entries(ev.statChanges).map(([k,v])=>{
