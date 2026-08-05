@@ -611,6 +611,7 @@ const INIT={
   collectionTasks: [],
   monthlyChallenge: {}, // monthKey("2026-6") → {title, target, count, achieved, checkedDates:[dateKey]} 每月只能设置一次目标，设置后title/target锁定不可改
   puzzleTools: [], // {id, goal, blocker, blindSpot, action, status:"active"} 拼图思考工具，存档后会从此数组移除并写入岛上新闻
+  distantQuests: [], // {id, title, desc, kind:"worry"|"interest", reward} 「远方」任务，可迁入「当下」或直接完成
 };
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
@@ -1133,7 +1134,7 @@ function CollapsibleRescueSection({s,save,pop}){
 function TagManageSection({s,save,pop}){
   const [open,setOpen]=useState(false);
   const [newTag,setNewTag]=useState("");
-  const FUNC=["任务","签到","座右铭","抽签","拼图"]; // 功能性标签不可删除，但可排序
+  const FUNC=["任务","任务-当下","任务-远方","签到","座右铭","抽签","拼图"]; // 功能性标签不可删除，但可排序
 
   // 系统标签始终排在最前面（按 FUNC 内部顺序），其余标签保持用户排序
   const tags=useMemo(()=>{
@@ -1298,6 +1299,10 @@ function App(){
   const [puzForm,         setPuzForm]           = useState(null); // 拼图新建表单 {goal,blocker,blindSpot,action}，null=未打开
   const [puzEditField,    setPuzEditField]      = useState(null); // 拼图单字段编辑 {id,field,value}，null=未打开
   const [puzExpanded,     setPuzExpanded]        = useState({}); // {puzzleId: true} 记录哪些拼图卡片当前展开了"卡点/盲区/行动"，纯UI状态不持久化
+  const [questTab,        setQuestTab]           = useState("now"); // "now"|"distant" 任务tab内的子tab
+  const [distantForm,     setDistantForm]        = useState(null); // 新建远方任务表单 {title,desc,kind,xp,long,short}
+  const [moveToDistant,   setMoveToDistant]      = useState(null); // 迁入远方弹窗 {id, title, fromType} 等待用户选kind
+  const [moveToCurrent,   setMoveToCurrent]      = useState(null); // 迁入当下弹窗 {id, title} 等待用户选任务类型
   const [staleTimers,     setStaleTimers]       = useState([]); // 加载时检测到超过1小时仍在计时的采集任务，等待用户确认是否丢弃
   const [mcForm,          setMcForm]             = useState(null); // 每月挑战设置弹窗表单 {title,target}，null=未打开
   const [drawQuestion,    setDrawQuestion]     = useState("");
@@ -1368,6 +1373,10 @@ function App(){
     if(!d.collectionTasks)            d.collectionTasks=[];
     if(!d.monthlyChallenge)           d.monthlyChallenge={};
     if(!d.puzzleTools)                d.puzzleTools=[];
+    if(!d.distantQuests)              d.distantQuests=[];
+    // 确保「任务-当下」和「任务-远方」标签存在于eventTags中
+    const requiredTags=["任务-当下","任务-远方"];
+    requiredTags.forEach(tag=>{if(!(d.eventTags||[]).includes(tag))d.eventTags=[...(d.eventTags||[]),tag];});
     // 字段兜底：确保 records/reward 结构完整（不清理 isTiming，避免误杀正常进行中的计时）
     d.collectionTasks=d.collectionTasks.map(ct=>({
       ...ct,records:ct.records||[],
@@ -1545,13 +1554,13 @@ function App(){
     const toastMsg=isMain?randPick(MAIN_TOASTS):randPick(SIDE_TOASTS);
     if(!didLevelUp)pop(`${toastMsg} ${rwdTxt(r,s.longStats,s.shortStats)}`);
     else{if(latestBadge)setNewBadge(latestBadge);}
-    // 确保"任务"标签存在
+    // 确保"任务-当下"标签存在
     const existingTags=s.eventTags||[];
-    const newTags=existingTags.includes("任务")?existingTags:[...existingTags,"任务"];
+    const newTags=existingTags.includes("任务-当下")?existingTags:[...existingTags,"任务-当下"];
     const ev={id:Date.now(),date:todayKey(),text:isMain&&(q.steps||0)>0
       ?(q.title+`，共走了 ${q.steps} 步`+(q.desc?`：${q.desc}`:""))
       :(q.title+(q.desc?`：${q.desc}`:""))
-      ,xp:r.xp||0,statChanges:{...lc,...sc},tag:"任务"};
+      ,xp:r.xp||0,statChanges:{...lc,...sc},tag:"任务-当下"};
     save({...s,
       player,badges,longStats,shortStats,
       mainQuests:s.mainQuests.filter(q2=>q2.id!==id),
@@ -1563,6 +1572,63 @@ function App(){
   const deleteQuest=id=>{
     save({...s,mainQuests:s.mainQuests.filter(q=>q.id!==id),sideQuests:s.sideQuests.filter(q=>q.id!==id),recurringQuests:s.recurringQuests.filter(q=>q.id!==id)});
     pop("🗑️ 已删除");
+  };
+  // ─── 「远方」任务 ───
+  // 新建远方任务（担心/兴趣）
+  const saveDistantQuest=()=>{
+    if(!distantForm.title.trim())return;
+    const reward={xp:Number(distantForm.xp)||5,long:{...distantForm.long},short:{...distantForm.short}};
+    Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
+    Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
+    if(distantForm.editId){
+      save({...s,distantQuests:(s.distantQuests||[]).map(q=>q.id===distantForm.editId?{...q,title:distantForm.title.trim(),desc:distantForm.desc||"",kind:distantForm.kind,reward}:q)});
+      setDistantForm(null);pop("✏️ 已保存");return;
+    }
+    const q={id:Date.now(),title:distantForm.title.trim(),desc:distantForm.desc||"",kind:distantForm.kind,reward};
+    save({...s,distantQuests:[...(s.distantQuests||[]),q]});
+    setDistantForm(null);pop(`${distantForm.kind==="worry"?"🌦️":"🪂"} 已放入远方`);
+  };
+  // 完成远方任务：记入岛记(tag=任务-远方) + 奖励
+  const completeDistantQuest=id=>{
+    const q=(s.distantQuests||[]).find(x=>x.id===id);if(!q)return;
+    const r=q.reward||{};
+    const{player,badges,longStats,shortStats,didLevelUp,latestBadge,lc,sc}=grantReward(r,{longOverflow:true});
+    const kindIcon=q.kind==="worry"?"🌦️":"🪂";
+    if(!didLevelUp)pop(`${kindIcon} ${rwdTxt(r,s.longStats,s.shortStats)}`);
+    else if(latestBadge)setNewBadge(latestBadge);
+    const ev={id:Date.now(),date:todayKey(),text:q.title+(q.desc?`：${q.desc}`:""),xp:r.xp||0,statChanges:{...lc,...sc},tag:"任务-远方"};
+    save({...s,player,badges,longStats,shortStats,
+      distantQuests:(s.distantQuests||[]).filter(x=>x.id!==id),
+      bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),
+    });
+  };
+  // 删除远方任务
+  const deleteDistantQuest=id=>{
+    save({...s,distantQuests:(s.distantQuests||[]).filter(x=>x.id!==id)});
+    pop("🗑️ 已删除");
+  };
+  // 迁入当下：远方任务 → 当下任务（用户选类型 main/side/recurring）
+  const confirmMoveToCurrent=(id,targetType)=>{
+    const q=(s.distantQuests||[]).find(x=>x.id===id);if(!q)return;
+    let newState={...s,distantQuests:(s.distantQuests||[]).filter(x=>x.id!==id)};
+    const base={id:Date.now(),title:q.title,desc:q.desc,reward:q.reward,done:false};
+    if(targetType==="main") newState={...newState,mainQuests:[...s.mainQuests,{...base,stepCap:20,steps:0}]};
+    else if(targetType==="side") newState={...newState,sideQuests:[...s.sideQuests,base]};
+    else if(targetType==="recurring") newState={...newState,recurringQuests:[...s.recurringQuests,{...base,period:"weekly",lastDone:""}]};
+    save(newState);setMoveToCurrent(null);
+    pop("🌴 已迁入当下");
+  };
+  // 迁入远方：当下任务（任意类型） → 远方任务（用户选担心/兴趣）
+  const confirmMoveToDistant=(id,fromType,kind)=>{
+    const srcList=fromType==="main"?s.mainQuests:fromType==="side"?s.sideQuests:s.recurringQuests;
+    const q=srcList.find(x=>x.id===id);if(!q)return;
+    const dq={id:Date.now(),title:q.title,desc:q.desc||"",kind,reward:q.reward||{xp:5,long:{},short:{}}};
+    let newState={...s,distantQuests:[...(s.distantQuests||[]),dq]};
+    if(fromType==="main") newState={...newState,mainQuests:s.mainQuests.filter(x=>x.id!==id)};
+    else if(fromType==="side") newState={...newState,sideQuests:s.sideQuests.filter(x=>x.id!==id)};
+    else if(fromType==="recurring") newState={...newState,recurringQuests:s.recurringQuests.filter(x=>x.id!==id)};
+    save(newState);setMoveToDistant(null);
+    pop(`${kind==="worry"?"🌦️":"🪂"} 已迁入远方`);
   };
   // ─── 采集任务 ───
   const startCollect=id=>{
@@ -1724,6 +1790,18 @@ function App(){
     const reward={xp:Number(qForm.xp)||10,long:{...qForm.long},short:{...qForm.short}};
     Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
     Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
+    if(qForm.editId){
+      // 编辑模式：更新已有任务的字段（标题/描述/奖励），不改变type/steps/lastDone等运行时字段
+      const editId=qForm.editId;
+      const upd=q=>q.id===editId?{...q,title:qForm.title.trim(),desc:qForm.desc||"",reward,...(qForm.type==="main"&&q.stepCap!==undefined?{stepCap:Number(qForm.stepCap)||20}:{})}:q;
+      save({...s,
+        mainQuests:s.mainQuests.map(upd),
+        sideQuests:s.sideQuests.map(upd),
+        recurringQuests:s.recurringQuests.map(q=>q.id===editId?{...q,title:qForm.title.trim(),desc:qForm.desc||"",reward,period:qForm.period||"weekly"}:q),
+      });
+      setModal(null);setQForm(null);pop("✏️ 已保存");
+      return;
+    }
     if(qForm.type==="recurring"){
       save({...s,recurringQuests:[...s.recurringQuests,{id:"r_"+Date.now(),title:qForm.title,desc:qForm.desc,period:qForm.period||"weekly",reward,lastDone:""}]});
     }else{
@@ -2052,29 +2130,46 @@ function App(){
           </div>
         </>}
         {tab==="quests"&&<>
-          {/* 快速电梯 */}
-          <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-            {[["q-main","🌵"],["q-side","🌳"],["q-recurring","💦"]].map(([id,label])=>(
-              <button key={id} onClick={()=>{
-                  const el=document.getElementById(id);
-                  if(!el)return;
-                  const y=el.getBoundingClientRect().top+window.scrollY-105;
-                  window.scrollTo({top:y,behavior:"smooth"});
-                }}
-                style={{flex:1,fontSize:17,fontWeight:700,color:"#5BAF5F",background:"none",border:"none",borderRadius:10,padding:"3px 4px",cursor:"pointer"}}>
-                {label}
+          {/* 统一横条：左侧子tab切换 + 右侧电梯（当下tab才显示） */}
+          <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)",alignItems:"center"}}>
+            {/* 子tab：当下/远方 */}
+            {[["now","🌴"],["distant","🌅"]].map(([k,icon])=>(
+              <button key={k} onClick={()=>setQuestTab(k)}
+                style={{padding:"5px 14px",borderRadius:10,border:"none",cursor:"pointer",fontSize:13,fontWeight:questTab===k?900:600,
+                  background:questTab===k?"#E8F5E8":"none",
+                  color:questTab===k?"#5BAF5F":"#B09070",transition:"all .2s"}}>
+                {icon}{questTab===k?(" "+(k==="now"?"当下":"远方")):""}
               </button>
             ))}
+            {/* 分隔 */}
+            <div style={{width:1,height:18,background:"#EDD9A3",margin:"0 4px"}}/>
+            {/* 电梯：当下时显示🌵🌳💦，远方时显示🌦️🪂 */}
+            {questTab==="now"
+              ?[["q-main","🌵"],["q-side","🌳"],["q-recurring","💦"]].map(([id,label])=>(
+                <button key={id} onClick={()=>{const el=document.getElementById(id);if(!el)return;window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-105,behavior:"smooth"});}}
+                  style={{flex:1,fontSize:17,fontWeight:700,color:"#5BAF5F",background:"none",border:"none",borderRadius:10,padding:"3px 4px",cursor:"pointer"}}>{label}</button>
+              ))
+              :[["dq-worry","🌦️"],["dq-interest","🪂"]].map(([id,label])=>(
+                <button key={id} onClick={()=>{const el=document.getElementById(id);if(!el)return;window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-105,behavior:"smooth"});}}
+                  style={{flex:1,fontSize:17,fontWeight:700,color:"#5BAF5F",background:"none",border:"none",borderRadius:10,padding:"3px 4px",cursor:"pointer"}}>{label}</button>
+              ))
+            }
           </div>
+
+          {/* ── 当下 ── */}
+          {questTab==="now"&&<>
           {[["main","🌵 开荒主线",s.mainQuests,"🌵"],["side","🌳 种树任务",s.sideQuests,"🌳"]].map(([type,label,list,icon])=>(
             <div key={type} id={`q-${type}`}>
             <ACCard title={label} action={<button style={S.plusBtn} onClick={()=>{setQForm({type,title:"",desc:"",xp:5,period:"weekly",long:{},short:{},stepCap:20});setModal("quest");}}>{t("＋ 新增","＋ Add")}</button>}>
               {list.filter(q=>!q.done).length===0&&<div style={S.empty}>暂无任务，去冒险吧！</div>}
               {list.filter(q=>!q.done).map(q=>(
                 <div key={q.id} style={{padding:"14px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
-                  {/* 第一行：标题 + 完成/删除 */}
                   <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                    <div style={{flex:1}}>
+                    <div style={{flex:1,cursor:"pointer"}} onClick={()=>{setQForm({
+                      editId:q.id,type,title:q.title,desc:q.desc||"",
+                      xp:q.reward?.xp||5,long:q.reward?.long||{},short:q.reward?.short||{},
+                      stepCap:q.stepCap||20,period:"weekly"
+                    });setModal("quest");}}>
                       <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>{icon} {q.title}</div>
                       {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
                       <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
@@ -2086,25 +2181,17 @@ function App(){
                   </div>
                   {type==="main"&&(
                     <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10}}>
-                      {/* 进度条 */}
                       <div style={{flex:1}}>
                         {(q.steps||0)>0&&<div style={{fontSize:11,color:"#a7c957",fontWeight:700,marginBottom:4}}>已走了 {q.steps} 步</div>}
                         <div style={{height:5,background:"#E8F0D8",borderRadius:3,overflow:"hidden"}}>
                           <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,#a7c957,#7fa832)",width:`${Math.min(100,((q.steps||0)/(q.stepCap||20))*100)}%`,transition:"width .4s"}}/>
                         </div>
                       </div>
-                      {/* 前进一步按钮 */}
                       <button style={{...S.plusBtn,fontSize:12,padding:"6px 14px",flexShrink:0}} onClick={()=>{
-                        const newSteps=(q.steps||0)+1;
-                        const cap=q.stepCap||20;
-                        const newQ={...q,steps:newSteps};
+                        const newSteps=(q.steps||0)+1;const cap=q.stepCap||20;const newQ={...q,steps:newSteps};
                         let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
-                        save({...s,
-                          mainQuests:s.mainQuests.map(x=>x.id===q.id?newQ:x),
-                          player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges,
-                        });
-                        if(s.player.level!==lv){setNewBadge(latestBadge);}
-                        else pop(`🌵 前进一步！🌸+1`);
+                        save({...s,mainQuests:s.mainQuests.map(x=>x.id===q.id?newQ:x),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+                        if(s.player.level!==lv){setNewBadge(latestBadge);}else pop(`🌵 前进一步！🌸+1`);
                         if(newSteps>=cap) setTimeout(()=>setStepCapQuest(newQ),300);
                       }}>前进一步 🌸</button>
                     </div>
@@ -2121,23 +2208,51 @@ function App(){
               const ok=canDoR(q);
               const lastDoneStr=q.lastDone?new Date(q.lastDone).toLocaleDateString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
               return<div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3",opacity:ok?1:0.45}}>
-                <div style={{flex:1}}>
+                <div style={{flex:1,cursor:"pointer"}} onClick={()=>{setQForm({editId:q.id,type:"recurring",title:q.title,desc:q.desc||"",xp:q.reward?.xp||5,long:q.reward?.long||{},short:q.reward?.short||{},period:q.period||"weekly",stepCap:20});setModal("quest");}}>
                   <div style={{fontSize:14,fontWeight:800,marginBottom:3}}>🔄 {q.title}</div>
                   <div style={{fontSize:10,color:"#B09070",marginBottom:2}}>{q.period==="weekly"?"每周日重置":"每月1日重置"}{lastDoneStr&&` · 上次：${lastDoneStr}`}</div>
                   {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
                   <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
                 </div>
                 <div style={{display:"flex",gap:6,flexShrink:0}}>
-                  {ok
-                    ?<button style={S.dBtn} onClick={()=>completeRecurring(q.id)}>完成</button>
-                    :<button style={{...S.dBtn,opacity:0.45,cursor:"not-allowed"}} disabled>完成</button>
-                  }
+                  {ok?<button style={S.dBtn} onClick={()=>completeRecurring(q.id)}>完成</button>
+                     :<button style={{...S.dBtn,opacity:0.45,cursor:"not-allowed"}} disabled>完成</button>}
                   <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
                 </div>
               </div>;
             })}
           </ACCard>
           </div>
+          </>}
+
+          {/* ── 远方 ── */}
+          {questTab==="distant"&&<>
+          {[["worry","🌦️ 担心","dq-worry"],["interest","🪂 兴趣","dq-interest"]].map(([kind,label,domId])=>{
+            const list=(s.distantQuests||[]).filter(q=>q.kind===kind);
+            return(
+              <div key={kind} id={domId} style={{marginBottom:12}}>
+              <ACCard title={label} action={<button style={S.plusBtn} onClick={()=>setDistantForm({title:"",desc:"",kind,xp:5,long:{},short:{}})}>＋ 新增</button>}>
+                {list.length===0&&<div style={S.empty}>{kind==="worry"?"把担心放在这里，让它在远方等着☁️":"把感兴趣的事放这里，不着急🪂"}</div>}
+                {list.map(q=>(
+                  <div key={q.id} style={{padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                      <div style={{flex:1,cursor:"pointer"}} onClick={()=>setDistantForm({editId:q.id,title:q.title,desc:q.desc||"",kind:q.kind,xp:q.reward?.xp||5,long:q.reward?.long||{},short:q.reward?.short||{}})}>
+                        <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>{kind==="worry"?"🌦️":"🪂"} {q.title}</div>
+                        {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
+                        <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
+                      </div>
+                      <div style={{display:"flex",gap:5,flexShrink:0}}>
+                        <button style={S.dBtn} onClick={()=>completeDistantQuest(q.id)}>完成</button>
+                        <button style={S.xBtn} onClick={()=>deleteDistantQuest(q.id)}>🗑</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </ACCard>
+              </div>
+            );
+          })}
+          </>}
 
         </>}
 
@@ -2979,12 +3094,12 @@ function App(){
 
       {modal==="quest"&&qForm&&(
         <Drawer onClose={()=>{setModal(null);setQForm(null);}}>
-          <div style={S.dH}>{t("岛上新任务 🏝️","New Quest 🏝️")}</div>
-          <div style={S.tog}>
+          <div style={S.dH}>{qForm.editId?t("编辑任务 ✏️","Edit Quest ✏️"):t("岛上新任务 🏝️","New Quest 🏝️")}</div>
+          {!qForm.editId&&<div style={S.tog}>
             {[["main",t("🌵 开荒主线","🌵 Pioneer")],["side",t("🌳 种树任务","🌳 Plant")],["recurring",t("💦 浇水任务","💦 Water")]].map(([t,l])=>(
               <button key={t} style={{...S.tBtn,...(qForm.type===t?S.tOn:{})}} onClick={()=>setQForm(p=>({...p,type:t}))}>{l}</button>
             ))}
-          </div>
+          </div>}
           {qForm.type==="recurring"&&<div style={S.tog}>
             {[["weekly",t("每周","Weekly")],["monthly",t("每月","Monthly")]].map(([t,l])=>(
               <button key={t} style={{...S.tBtn,...(qForm.period===t?S.tOn:{})}} onClick={()=>setQForm(p=>({...p,period:t}))}>{l}</button>
@@ -3011,7 +3126,12 @@ function App(){
           <BonusRow stats={s.longStats} bonus={qForm.long} onChange={b=>setQForm(p=>({...p,long:b}))}/>
           <FL>今日属性加成</FL>
           <BonusRow stats={s.shortStats} bonus={qForm.short} onChange={b=>setQForm(p=>({...p,short:b}))}/>
-          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveQuest}>确认接取 🌿</button>
+          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveQuest}>{qForm.editId?"保存修改 ✏️":"确认接取 🌿"}</button>
+          {/* 编辑模式下的迁移操作 */}
+          {qForm.editId&&<>
+            <div style={{textAlign:"center",fontSize:11,color:"#B09070",margin:"12px 0 6px"}}>── 迁移 ──</div>
+            <button style={{...S.dBtn,width:"100%",background:"#EEF6FF",color:"#5588CC"}} onClick={()=>{setModal(null);setQForm(null);setMoveToDistant({id:qForm.editId,title:qForm.title,fromType:qForm.type});}}>🌅 迁入远方</button>
+          </>}
         </Drawer>
       )}
 
@@ -3059,6 +3179,62 @@ function App(){
         <Drawer onClose={()=>{setModal(null);setHabEdit(null);}}>
           <HabitEditor habit={habEdit} longStats={s.longStats} shortStats={s.shortStats} onSave={saveHabit} onDelete={habEdit.id?()=>deleteHabit(habEdit.id):null}/>
         </Drawer>
+      )}
+
+      {/* 新建/编辑远方任务表单 */}
+      {distantForm&&(
+        <Drawer onClose={()=>setDistantForm(null)}>
+          <div style={S.dH}>{distantForm.editId?"编辑远方 ✏️":(distantForm.kind==="worry"?"新建担心 🌦️":"新建兴趣 🪂")}</div>
+          {distantForm.editId&&<div style={S.tog}>
+            {[["worry","🌦️ 担心"],["interest","🪂 兴趣"]].map(([k,l])=>(
+              <button key={k} style={{...S.tBtn,...(distantForm.kind===k?S.tOn:{})}} onClick={()=>setDistantForm(p=>({...p,kind:k}))}>{l}</button>
+            ))}
+          </div>}
+          <FL>标题</FL>
+          <input style={S.inp} placeholder={distantForm.kind==="worry"?"我在担心…":"我有兴趣…"} value={distantForm.title} onChange={e=>setDistantForm(p=>({...p,title:e.target.value}))}/>
+          <FL>描述（可选）</FL>
+          <input style={S.inp} placeholder="多说几句" value={distantForm.desc} onChange={e=>setDistantForm(p=>({...p,desc:e.target.value}))}/>
+          <FL>🌸 奖励</FL>
+          <input type="number" style={{...S.inp,width:90}} value={distantForm.xp} onChange={e=>setDistantForm(p=>({...p,xp:e.target.value}))}/>
+          <FL>长期属性加成</FL>
+          <BonusRow stats={s.longStats} bonus={distantForm.long} onChange={b=>setDistantForm(p=>({...p,long:b}))}/>
+          <FL>今日属性加成</FL>
+          <BonusRow stats={s.shortStats} bonus={distantForm.short} onChange={b=>setDistantForm(p=>({...p,short:b}))}/>
+          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveDistantQuest}>{distantForm.editId?"保存修改 ✏️":"放入远方 🌅"}</button>
+          {distantForm.editId&&<>
+            <div style={{textAlign:"center",fontSize:11,color:"#B09070",margin:"12px 0 6px"}}>── 迁移 ──</div>
+            <button style={{...S.dBtn,width:"100%",background:"#F0FFF0",color:"#3A7D3E"}} onClick={()=>{setDistantForm(null);setMoveToCurrent({id:distantForm.editId,title:distantForm.title});}}>🌴 迁入当下</button>
+          </>}
+        </Drawer>
+      )}
+
+      {/* 迁入远方：选担心还是兴趣 */}
+      {moveToDistant&&(
+        <div style={S.modalCenter} onClick={()=>setMoveToDistant(null)}>
+          <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 22px",maxWidth:320,width:"92%",boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #EDD9A3"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:15,fontWeight:900,color:"#3D2B1F",marginBottom:4}}>迁入远方 🌅</div>
+            <div style={{fontSize:12,color:"#B09070",marginBottom:18}}>「{moveToDistant.title}」归入哪类？</div>
+            <div style={{display:"flex",gap:10}}>
+              <button style={{...S.cfmBtn,flex:1}} onClick={()=>confirmMoveToDistant(moveToDistant.id,moveToDistant.fromType,"worry")}>🌦️ 担心</button>
+              <button style={{...S.cfmBtn,flex:1,background:"#EEF6FF",color:"#5588CC"}} onClick={()=>confirmMoveToDistant(moveToDistant.id,moveToDistant.fromType,"interest")}>🪂 兴趣</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 迁入当下：选任务类型 */}
+      {moveToCurrent&&(
+        <div style={S.modalCenter} onClick={()=>setMoveToCurrent(null)}>
+          <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 22px",maxWidth:320,width:"92%",boxShadow:"0 20px 60px rgba(0,0,0,.22)",border:"2.5px solid #EDD9A3"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:15,fontWeight:900,color:"#3D2B1F",marginBottom:4}}>迁入当下 🌴</div>
+            <div style={{fontSize:12,color:"#B09070",marginBottom:18}}>「{moveToCurrent.title}」变成哪种任务？</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <button style={S.cfmBtn} onClick={()=>confirmMoveToCurrent(moveToCurrent.id,"main")}>🌵 开荒主线</button>
+              <button style={{...S.cfmBtn,background:"#F0FFF0",color:"#3A7D3E"}} onClick={()=>confirmMoveToCurrent(moveToCurrent.id,"side")}>🌳 种树任务</button>
+              <button style={{...S.cfmBtn,background:"#EEF6FF",color:"#5588CC"}} onClick={()=>confirmMoveToCurrent(moveToCurrent.id,"recurring")}>💦 浇水任务</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 计时器新增表单：独立于任务新增弹窗 */}
@@ -3777,7 +3953,7 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
         })()}
         {/* tag pills */}
         {(()=>{
-          const FUNC=["任务","签到","座右铭","抽签","拼图"];
+          const FUNC=["任务","任务-当下","任务-远方","签到","座右铭","抽签","拼图"];
           const sysInOrder=eventTags.filter(t=>FUNC.includes(t));
           const others=eventTags.filter(t=>!FUNC.includes(t));
           return[...sysInOrder,...others];
