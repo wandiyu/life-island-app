@@ -1134,7 +1134,7 @@ function CollapsibleRescueSection({s,save,pop}){
 function TagManageSection({s,save,pop}){
   const [open,setOpen]=useState(false);
   const [newTag,setNewTag]=useState("");
-  const FUNC=["任务","签到","座右铭","抽签","拼图"]; // 功能性标签不可删除，但可排序
+  const FUNC=["任务","签到","座右铭","抽签","拼图","计时器"]; // 功能性标签不可删除，但可排序
 
   // 系统标签始终排在最前面（按 FUNC 内部顺序），其余标签保持用户排序
   const tags=useMemo(()=>{
@@ -1295,7 +1295,8 @@ function App(){
   const [nicknameFishIdx, setNicknameFishIdx]  = useState(null);
   const [ceremonyNick,    setCeremonyNick]     = useState("");
   const [stepCapQuest,    setStepCapQuest]     = useState(null);
-  const [colForm,         setColForm]          = useState(null); // 计时器新增表单 {title,desc,xp,long,short}，null=未打开
+  const [colForm,         setColForm]          = useState(null); // 计时器新增/编辑表单 {title,desc,xp,long,short,editId?}，null=未打开
+  const [colArchivePrompt,setColArchivePrompt] = useState(null); // 计时器10次存档提醒 {id}，null=无提醒
   const [puzForm,         setPuzForm]           = useState(null); // 拼图新建表单 {goal,blocker,blindSpot,action}，null=未打开
   const [puzEditField,    setPuzEditField]      = useState(null); // 拼图单字段编辑 {id,field,value}，null=未打开
   const [puzExpanded,     setPuzExpanded]        = useState({}); // {puzzleId: true} 记录哪些拼图卡片当前展开了"卡点/盲区/行动"，纯UI状态不持久化
@@ -1374,8 +1375,9 @@ function App(){
     if(!d.monthlyChallenge)           d.monthlyChallenge={};
     if(!d.puzzleTools)                d.puzzleTools=[];
     if(!d.distantQuests)              d.distantQuests=[];
-    // 确保「任务」标签存在于eventTags中
+    // 确保「任务」「计时器」标签存在于eventTags中
     if(!(d.eventTags||[]).includes("任务"))d.eventTags=[...(d.eventTags||[]),"任务"];
+    if(!(d.eventTags||[]).includes("计时器"))d.eventTags=[...(d.eventTags||[]),"计时器"];
     // 字段兜底：确保 records/reward 结构完整（不清理 isTiming，避免误杀正常进行中的计时）
     d.collectionTasks=d.collectionTasks.map(ct=>({
       ...ct,records:ct.records||[],
@@ -1660,6 +1662,8 @@ function App(){
     const timeStr=mins>0?`${mins}分${secs}秒`:`${secs}秒`;
     if(didLevelUp){setNewBadge(latestBadge);}
     else pop(`🍏 用时 ${timeStr} · ${rwdTxt(r,s.longStats,s.shortStats)}`);
+    // 第10次记录时弹出存档提醒
+    if(newRecords.length===10) setTimeout(()=>setColArchivePrompt({id}),400);
   };
   const deleteCollect=id=>{
     save({...s,collectionTasks:(s.collectionTasks||[]).filter(c=>c.id!==id)});
@@ -1825,9 +1829,33 @@ function App(){
     const reward={xp:Number(colForm.xp)||1,long:{...colForm.long},short:{...colForm.short}};
     Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
     Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
+    if(colForm.editId){
+      // 编辑模式：更新名称/描述/奖励，保留records和计时状态
+      save({...s,collectionTasks:(s.collectionTasks||[]).map(c=>c.id===colForm.editId?{...c,name:colForm.title.trim(),desc:colForm.desc,reward}:c)});
+      setColForm(null);pop("✏️ 已保存");return;
+    }
     const newCt={id:"col_"+Date.now(),name:colForm.title.trim(),desc:colForm.desc,reward,records:[],isTiming:false,startTime:null};
     save({...s,collectionTasks:[...(s.collectionTasks||[]),newCt]});
     setColForm(null);pop(`⏳ 已添加「${newCt.name}」`);
+  };
+  // 存档：把统计写入岛记，并删除这个计时器（存档=永久归档，不再继续计时）
+  const archiveCollect=id=>{
+    const ct=(s.collectionTasks||[]).find(c=>c.id===id);if(!ct)return;
+    const records=ct.records||[];if(records.length===0)return;
+    const fmt=sec=>{const m=Math.floor(sec/60),s2=sec%60;return m>0?`${m}分${s2}秒`:`${s2}秒`;};
+    const avg=Math.round(records.reduce((a,b)=>a+b,0)/records.length);
+    const max=Math.max(...records);const min=Math.min(...records);
+    const text=`${ct.name}：共 ${records.length} 次 · 平均 ${fmt(avg)} · 最长 ${fmt(max)} · 最短 ${fmt(min)}`;
+    const ev={id:Date.now(),date:todayKey(),text,xp:0,statChanges:{},tag:"计时器"};
+    const existingTags=s.eventTags||[];
+    const newTags=existingTags.includes("计时器")?existingTags:[...existingTags,"计时器"];
+    save({...s,
+      collectionTasks:(s.collectionTasks||[]).filter(c=>c.id!==id),
+      bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),
+      eventTags:newTags,
+    });
+    setColArchivePrompt(null);
+    pop(`📊 「${ct.name}」已存档`);
   };
   // ─── 🧩 拼图思考工具 ───
   // 新建：四个字段必填才能保存
@@ -1978,6 +2006,29 @@ function App(){
               </div>
               <button style={S.cfmBtn} onClick={()=>keepStaleTimer(cur.id)}>{t("这是真的，继续计时","Keep timing")}</button>
               <button style={{...S.cfmBtn,marginTop:8,background:"#FFF0EE",color:"#C0392B",boxShadow:"none",border:"2px solid #FFB3A8"}} onClick={()=>discardStaleTimer(cur.id)}>{t("丢弃这次计时","Discard")}</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 计时器10次存档提醒 */}
+      {colArchivePrompt&&(()=>{
+        const ct=(s.collectionTasks||[]).find(c=>c.id===colArchivePrompt.id);
+        if(!ct)return null;
+        const records=ct.records||[];
+        const fmt=sec=>{const m=Math.floor(sec/60),s2=sec%60;return m>0?`${m}分${s2}秒`:`${s2}秒`;};
+        const avg=records.length>0?Math.round(records.reduce((a,b)=>a+b,0)/records.length):0;
+        const max=records.length>0?Math.max(...records):0;
+        const min=records.length>0?Math.min(...records):0;
+        return(
+          <div style={S.modalCenter} onClick={()=>setColArchivePrompt(null)}>
+            <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 22px",maxWidth:320,width:"92%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.25)",border:"3px solid #C8E8C8"}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:26,marginBottom:8}}>📊</div>
+              <div style={{fontSize:15,fontWeight:900,color:"#3D2B1F",marginBottom:6}}>「{ct.name}」已记录10次！</div>
+              <div style={{fontSize:12,color:"#7A5C44",marginBottom:4}}>平均 {fmt(avg)} · 最长 {fmt(max)} · 最短 {fmt(min)}</div>
+              <div style={{fontSize:12,color:"#B09070",marginBottom:18}}>要把这些记录存入岛记吗？存档后这个计时器会删除。</div>
+              <button style={S.cfmBtn} onClick={()=>archiveCollect(colArchivePrompt.id)}>📊 存档并删除</button>
+              <button style={{...S.cfmBtn,marginTop:8,background:"#F5F5F5",color:"#7A5C44",boxShadow:"none"}} onClick={()=>setColArchivePrompt(null)}>继续记录</button>
             </div>
           </div>
         );
@@ -2185,24 +2236,27 @@ function App(){
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
                       <button style={S.dBtn} onClick={()=>completeQuest(q.id)}>完成</button>
-                      <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
                     </div>
                   </div>
                   {type==="main"&&(
-                    <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10}}>
-                      <div style={{flex:1}}>
-                        {(q.steps||0)>0&&<div style={{fontSize:11,color:"#a7c957",fontWeight:700,marginBottom:4}}>已走了 {q.steps} 步</div>}
-                        <div style={{height:5,background:"#E8F0D8",borderRadius:3,overflow:"hidden"}}>
-                          <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,#a7c957,#7fa832)",width:`${Math.min(100,((q.steps||0)/(q.stepCap||20))*100)}%`,transition:"width .4s"}}/>
+                    <div style={{marginTop:10}}>
+                      <button
+                        style={{width:"100%",position:"relative",height:32,borderRadius:8,border:"1.5px solid #d8ebb0",background:"#F0F7E4",overflow:"hidden",cursor:"pointer",padding:0,display:"block"}}
+                        onClick={()=>{
+                          const newSteps=(q.steps||0)+1;const cap=q.stepCap||20;const newQ={...q,steps:newSteps};
+                          let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+                          save({...s,mainQuests:s.mainQuests.map(x=>x.id===q.id?newQ:x),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+                          if(s.player.level!==lv){setNewBadge(latestBadge);}else pop(`🌵 前进一步！🌸+1`);
+                          if(newSteps>=cap) setTimeout(()=>setStepCapQuest(newQ),300);
+                        }}>
+                        {/* 进度填充：更浅的绿 */}
+                        <div style={{position:"absolute",inset:0,width:`${Math.min(100,((q.steps||0)/(q.stepCap||20))*100)}%`,background:"linear-gradient(90deg,#c8e89a,#aed676)",transition:"width .4s"}}/>
+                        {/* 左侧步数，右侧前进提示，都在填充层上方 */}
+                        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 10px"}}>
+                          <span style={{fontSize:11,fontWeight:700,color:"#5a7a20"}}>{q.steps||0} / {q.stepCap||20} 步</span>
+                          <span style={{fontSize:11,fontWeight:800,color:"#5a7a20"}}>→ 前进 🌸</span>
                         </div>
-                      </div>
-                      <button style={{...S.plusBtn,fontSize:12,padding:"6px 14px",flexShrink:0}} onClick={()=>{
-                        const newSteps=(q.steps||0)+1;const cap=q.stepCap||20;const newQ={...q,steps:newSteps};
-                        let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
-                        save({...s,mainQuests:s.mainQuests.map(x=>x.id===q.id?newQ:x),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
-                        if(s.player.level!==lv){setNewBadge(latestBadge);}else pop(`🌵 前进一步！🌸+1`);
-                        if(newSteps>=cap) setTimeout(()=>setStepCapQuest(newQ),300);
-                      }}>前进一步 🌸</button>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2226,7 +2280,6 @@ function App(){
                 <div style={{display:"flex",gap:6,flexShrink:0}}>
                   {ok?<button style={S.dBtn} onClick={()=>completeRecurring(q.id)}>完成</button>
                      :<button style={{...S.dBtn,opacity:0.45,cursor:"not-allowed"}} disabled>完成</button>}
-                  <button style={S.xBtn} onClick={()=>deleteQuest(q.id)}>🗑</button>
                 </div>
               </div>;
             })}
@@ -2254,7 +2307,6 @@ function App(){
                       </div>
                       <div style={{display:"flex",gap:5,flexShrink:0}}>
                         <button style={S.dBtn} onClick={()=>completeDistantQuest(q.id)}>完成</button>
-                        <button style={S.xBtn} onClick={()=>deleteDistantQuest(q.id)}>🗑</button>
                       </div>
                     </div>
                   </div>
@@ -2447,7 +2499,7 @@ function App(){
               return(
                 <div key={ct.id} style={{padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                    <div style={{flex:1}}>
+                    <div style={{flex:1,cursor:"pointer"}} onClick={()=>setColForm({editId:ct.id,title:ct.name,desc:ct.desc||"",xp:r.xp||1,long:r.long||{},short:r.short||{}})}>
                       <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>⏳ {ct.name}</div>
                       {ct.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{ct.desc}</div>}
                       <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(r,s.longStats,s.shortStats)}</div>
@@ -2456,13 +2508,14 @@ function App(){
                         {records.length>1&&` · 最长 ${fmt(maxSec)} · 最短 ${fmt(minSec)}`}
                       </div>
                     </div>
-                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0,alignItems:"flex-end"}}>
                       {timing
                         ?<button style={{...S.dBtn,background:"#FFD166",color:"#7A4A00"}} onClick={()=>stopCollect(ct.id)}>结束</button>
                         :<button style={S.dBtn} onClick={()=>startCollect(ct.id)}>开始</button>
                       }
-                      <button style={S.xBtn} onClick={()=>deleteCollect(ct.id)}>🗑</button>
-                    </div>
+                      {records.length>0&&!timing&&(
+                        <button style={{...S.dBtn,fontSize:11,background:"#F0FFF0",color:"#3A7D3E"}} onClick={()=>archiveCollect(ct.id)}>📊 存档</button>
+                      )}                    </div>
                   </div>
                   {timing&&(
                     <div style={{marginTop:8,fontSize:11,color:"#A06000",fontWeight:700}}>⏳ 计时中…</div>
@@ -3142,6 +3195,7 @@ function App(){
           {qForm.editId&&<>
             <div style={{textAlign:"center",fontSize:11,color:"#B09070",margin:"12px 0 6px"}}>── 迁移 ──</div>
             <button style={{...S.dBtn,width:"100%",background:"#EEF6FF",color:"#5588CC"}} onClick={()=>{setModal(null);setQForm(null);setMoveToDistant({id:qForm.editId,title:qForm.title,fromType:qForm.type});}}>🌅 迁入远方</button>
+            <button style={{...S.dBtn,width:"100%",background:"#FFF0EE",color:"#C0392B",border:"2px solid #FFB3A8",marginTop:6}} onClick={()=>{deleteQuest(qForm.editId);setModal(null);setQForm(null);}}>🗑️ 删除任务</button>
           </>}
         </Drawer>
       )}
@@ -3215,6 +3269,7 @@ function App(){
           {distantForm.editId&&<>
             <div style={{textAlign:"center",fontSize:11,color:"#B09070",margin:"12px 0 6px"}}>── 迁移 ──</div>
             <button style={{...S.dBtn,width:"100%",background:"#F0FFF0",color:"#3A7D3E"}} onClick={()=>{setDistantForm(null);setMoveToCurrent({id:distantForm.editId,title:distantForm.title});}}>🌴 迁入当下</button>
+            <button style={{...S.dBtn,width:"100%",background:"#FFF0EE",color:"#C0392B",border:"2px solid #FFB3A8",marginTop:6}} onClick={()=>{deleteDistantQuest(distantForm.editId);setDistantForm(null);}}>🗑️ 删除任务</button>
           </>}
         </Drawer>
       )}
@@ -3252,7 +3307,7 @@ function App(){
       {/* 计时器新增表单：独立于任务新增弹窗 */}
       {colForm&&(
         <Drawer onClose={()=>setColForm(null)}>
-          <div style={S.dH}>{t("新建计时器 ⏳","New Timer ⏳")}</div>
+          <div style={S.dH}>{colForm.editId?t("编辑计时器 ✏️","Edit Timer ✏️"):t("新建计时器 ⏳","New Timer ⏳")}</div>
           <FL>计时器名称</FL>
           <input style={S.inp} placeholder="例：摸鱼、拔草、捡贝壳" value={colForm.title} onChange={e=>setColForm(p=>({...p,title:e.target.value}))}/>
           <FL>描述（可选）</FL>
@@ -3263,7 +3318,11 @@ function App(){
           <BonusRow stats={s.longStats} bonus={colForm.long} onChange={b=>setColForm(p=>({...p,long:b}))}/>
           <FL>今日属性加成</FL>
           <BonusRow stats={s.shortStats} bonus={colForm.short} onChange={b=>setColForm(p=>({...p,short:b}))}/>
-          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveColTimer}>确认建立 ⏳</button>
+          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveColTimer}>{colForm.editId?"保存修改 ✏️":"确认建立 ⏳"}</button>
+          {colForm.editId&&<>
+            <div style={{textAlign:"center",fontSize:11,color:"#B09070",margin:"12px 0 6px"}}>── 其他操作 ──</div>
+            <button style={{...S.dBtn,width:"100%",background:"#FFF0EE",color:"#C0392B",border:"2px solid #FFB3A8"}} onClick={()=>{deleteCollect(colForm.editId);setColForm(null);}}>🗑️ 删除这个计时器</button>
+          </>}
         </Drawer>
       )}
 
@@ -3965,7 +4024,7 @@ function BigEventsCard({events,eventTags,longStats,shortStats,today,onAdd,onEdit
         })()}
         {/* tag pills */}
         {(()=>{
-          const FUNC=["任务","签到","座右铭","抽签","拼图"];
+          const FUNC=["任务","签到","座右铭","抽签","拼图","计时器"];
           const sysInOrder=eventTags.filter(t=>FUNC.includes(t));
           const others=eventTags.filter(t=>!FUNC.includes(t));
           return[...sysInOrder,...others];
