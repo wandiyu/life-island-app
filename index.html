@@ -1303,6 +1303,9 @@ function App(){
   const [colForm,         setColForm]          = useState(null); // 计时器新增/编辑表单 {title,desc,xp,long,short,editId?}，null=未打开
   const [colArchivePrompt,setColArchivePrompt] = useState(null); // 计时器10次存档提醒 {id}，null=无提醒
   const [distantOutcome,  setDistantOutcome]   = useState(null); // 远方任务结局选择 {id, title, kind}，null=未打开
+  const [milestoneModal,  setMilestoneModal]   = useState(null); // 里程碑弹窗 {questId}，null=未打开
+  const [msInput,         setMsInput]          = useState(""); // 里程碑新增输入框
+  const [msEditId,        setMsEditId]         = useState(null); // 正在编辑的里程碑id，null=不在编辑
   const [puzForm,         setPuzForm]           = useState(null); // 拼图新建表单 {goal,blocker,blindSpot,action}，null=未打开
   const [puzEditField,    setPuzEditField]      = useState(null); // 拼图单字段编辑 {id,field,value}，null=未打开
   const [puzExpanded,     setPuzExpanded]        = useState({}); // {puzzleId: true} 记录哪些拼图卡片当前展开了"卡点/盲区/行动"，纯UI状态不持久化
@@ -1323,7 +1326,8 @@ function App(){
   const [cbtColor,        setCbtColor]         = useState("");
   const [cbtSummary,      setCbtSummary]       = useState("");
   const [cbtPickerOpen,   setCbtPickerOpen]    = useState(false); // {index, nickname}
-  const popT     = useRef(null);
+  const popT       = useRef(null);
+  const morningShown = useRef(false); // 防止同一次 App 启动因 user 状态变化导致 initData 重跑时签到弹窗弹两次
   const importRef= useRef(null);
 
   // Firebase auth state listener
@@ -1495,10 +1499,9 @@ function App(){
     dbSet(d);setS(d);
     // 提醒用户处理卡死超过1小时的采集任务计时
     if(staleCollectTimers.length>0) setStaleTimers(staleCollectTimers);
-    // 签到检测：每天05:00后首次打开时弹出
-    const morningKey=`morningCheckin_${today}`;
-    if(!d.checkinDates?.[today]&&h>=5){
-      // 初始值取当前 shortStats（可能已被重置为80）
+    // 签到检测：每天05:00后首次打开时弹出（用 morningShown ref 防止 user 变化导致 initData 重跑时重复弹出）
+    if(!d.checkinDates?.[today]&&h>=5&&!morningShown.current){
+      morningShown.current=true;
       setMorningVals({mood:80, energy:80, cognition:80});
       setTimeout(()=>setShowMorning(true), 2000);
     }
@@ -1567,8 +1570,11 @@ function App(){
     const typeLabel=isMain?"开荒主线":"种树任务";
     const stepsNote=isMain&&(q.steps||0)>0?`，共走了 ${q.steps} 步`:"";
     const descNote=q.desc?`，${q.desc}`:"";
+    const msNote=isMain&&(q.milestones||[]).length>0
+      ?"\n里程碑：\n"+(q.milestones||[]).map(m=>`${m.done?"✓":"○"} ${m.text}`).join("\n")
+      :"";
     const ev={id:Date.now(),date:todayKey(),
-      text:`${typeLabel}：${q.title}${stepsNote}${descNote}`,
+      text:`${typeLabel}：${q.title}${stepsNote}${descNote}${msNote}`,
       xp:r.xp||0,statChanges:{...lc,...sc},tag:"任务"};
     save({...s,
       player,badges,longStats,shortStats,
@@ -1581,6 +1587,43 @@ function App(){
   const deleteQuest=id=>{
     save({...s,mainQuests:s.mainQuests.filter(q=>q.id!==id),sideQuests:s.sideQuests.filter(q=>q.id!==id),recurringQuests:s.recurringQuests.filter(q=>q.id!==id)});
     pop("🗑️ 已删除");
+  };
+  // ─── 里程碑 ───
+  // 获取当前弹窗对应的任务
+  const getMsQuest=()=>s.mainQuests.find(q=>q.id===milestoneModal?.questId);
+  // 新增里程碑（不前进）
+  const addMilestone=()=>{
+    if(!msInput.trim())return;
+    const q=getMsQuest();if(!q)return;
+    const ms=[...(q.milestones||[]),{id:Date.now(),text:msInput.trim(),done:false}];
+    save({...s,mainQuests:s.mainQuests.map(x=>x.id===q.id?{...x,milestones:ms}:x)});
+    setMsInput("");
+  };
+  // 编辑保存里程碑文字（不前进）
+  const saveMsEdit=(msId,text)=>{
+    if(!text.trim())return;
+    const q=getMsQuest();if(!q)return;
+    const ms=(q.milestones||[]).map(m=>m.id===msId?{...m,text:text.trim()}:m);
+    save({...s,mainQuests:s.mainQuests.map(x=>x.id===q.id?{...x,milestones:ms}:x)});
+    setMsEditId(null);
+  };
+  // 打勾完成里程碑：标记done，同时前进一步（不可撤销）
+  const checkMilestone=msId=>{
+    const q=getMsQuest();if(!q)return;
+    const ms=(q.milestones||[]).map(m=>m.id===msId?{...m,done:true}:m);
+    const newSteps=(q.steps||0)+1;
+    const cap=q.stepCap||20;
+    const newQ={...q,milestones:ms,steps:newSteps};
+    let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
+    save({...s,mainQuests:s.mainQuests.map(x=>x.id===q.id?newQ:x),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
+    if(s.player.level!==lv){setNewBadge(latestBadge);}else pop(`🌵 前进一步！🌸+1`);
+    if(newSteps>=cap) setTimeout(()=>setStepCapQuest(newQ),300);
+  };
+  // 删除里程碑（未完成时才可删）
+  const deleteMilestone=msId=>{
+    const q=getMsQuest();if(!q)return;
+    const ms=(q.milestones||[]).filter(m=>m.id!==msId);
+    save({...s,mainQuests:s.mainQuests.map(x=>x.id===q.id?{...x,milestones:ms}:x)});
   };
   // ─── 「远方」任务 ───
   // 新建远方任务（深海/云端/驿站）
@@ -2030,6 +2073,65 @@ function App(){
         );
       })()}
 
+      {/* 里程碑弹窗 */}
+      {milestoneModal&&(()=>{
+        const q=s.mainQuests.find(x=>x.id===milestoneModal.questId);
+        if(!q)return null;
+        const ms=q.milestones||[];
+        return(
+          <div style={S.modalCenter} onClick={()=>{setMilestoneModal(null);setMsEditId(null);setMsInput("");}}>
+            <div style={{background:"#FFFDF5",borderRadius:24,padding:"22px 20px",maxWidth:360,width:"94%",maxHeight:"80vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.2)",border:"2px solid #EDD9A3"}} onClick={e=>e.stopPropagation()}>
+              {/* 标题 */}
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:11,color:"#B09070",marginBottom:2}}>🌵 {q.title}</div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{fontSize:14,fontWeight:900,color:"#3D2B1F"}}>里程碑</div>
+                  <div style={{fontSize:11,color:"#a7c957",fontWeight:700}}>{q.steps||0} / {q.stepCap||20} 步</div>
+                </div>
+              </div>
+              {/* 列表 */}
+              <div style={{flex:1,overflowY:"auto",marginBottom:14}}>
+                {ms.length===0&&<div style={{textAlign:"center",color:"#B09070",fontSize:12,padding:"20px 0"}}>还没有里程碑，在下方添加第一个吧</div>}
+                {ms.map((m,i)=>(
+                  <div key={m.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid #F0E8D8"}}>
+                    {/* 勾选框：已完成灰显不可点，未完成可点击前进 */}
+                    <button
+                      disabled={m.done}
+                      onClick={()=>checkMilestone(m.id)}
+                      style={{flexShrink:0,width:22,height:22,borderRadius:6,border:`2px solid ${m.done?"#c8e89a":"#a7c957"}`,background:m.done?"#c8e89a":"transparent",cursor:m.done?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,padding:0}}>
+                      {m.done?"✓":""}
+                    </button>
+                    {/* 文字：点击进入编辑（仅未完成） */}
+                    {msEditId===m.id?(
+                      <input autoFocus style={{...S.inp,flex:1,fontSize:13,padding:"4px 8px"}}
+                        defaultValue={m.text}
+                        onBlur={e=>saveMsEdit(m.id,e.target.value)}
+                        onKeyDown={e=>{if(e.key==="Enter")saveMsEdit(m.id,e.target.value);if(e.key==="Escape")setMsEditId(null);}}/>
+                    ):(
+                      <div style={{flex:1,fontSize:13,color:m.done?"#B09070":"#3D2B1F",textDecoration:m.done?"line-through":"none",cursor:m.done?"default":"pointer",lineHeight:1.4}}
+                        onClick={()=>!m.done&&setMsEditId(m.id)}>
+                        {m.text}
+                      </div>
+                    )}
+                    {/* 删除（仅未完成） */}
+                    {!m.done&&msEditId!==m.id&&(
+                      <button onClick={()=>deleteMilestone(m.id)} style={{flexShrink:0,background:"none",border:"none",cursor:"pointer",fontSize:13,opacity:.4,padding:"0 2px"}}>×</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* 新增输入框 */}
+              <div style={{display:"flex",gap:8}}>
+                <input style={{...S.inp,flex:1,fontSize:13}} placeholder="新增里程碑…"
+                  value={msInput} onChange={e=>setMsInput(e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter")addMilestone();}}/>
+                <button style={{...S.plusBtn,flexShrink:0,padding:"0 14px"}} onClick={addMilestone}>＋</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 远方任务结局选择弹窗（深海/云端完成时） */}
       {distantOutcome&&(()=>{
         const outcomes=DISTANT_OUTCOMES[distantOutcome.kind]||[];
@@ -2294,16 +2396,10 @@ function App(){
                     <div style={{marginTop:10}}>
                       <button
                         style={{width:"100%",position:"relative",height:32,borderRadius:8,border:"1.5px solid #d8ebb0",background:"#F0F7E4",overflow:"hidden",cursor:"pointer",padding:0,display:"block"}}
-                        onClick={()=>{
-                          const newSteps=(q.steps||0)+1;const cap=q.stepCap||20;const newQ={...q,steps:newSteps};
-                          let{xp,lv,xpN,newBadges,latestBadge}=lvUp(s.player.xp+1,s.player.level,s.player.xpNext,s.badges);
-                          save({...s,mainQuests:s.mainQuests.map(x=>x.id===q.id?newQ:x),player:{...s.player,xp,level:lv,xpNext:xpN},badges:newBadges});
-                          if(s.player.level!==lv){setNewBadge(latestBadge);}else pop(`🌵 前进一步！🌸+1`);
-                          if(newSteps>=cap) setTimeout(()=>setStepCapQuest(newQ),300);
-                        }}>
+                        onClick={()=>{setMilestoneModal({questId:q.id});setMsInput("");setMsEditId(null);}}>
                         {/* 进度填充：更浅的绿 */}
                         <div style={{position:"absolute",inset:0,width:`${Math.min(100,((q.steps||0)/(q.stepCap||20))*100)}%`,background:"linear-gradient(90deg,#c8e89a,#aed676)",transition:"width .4s"}}/>
-                        {/* 左侧步数，右侧前进提示，都在填充层上方 */}
+                        {/* 左侧步数，右侧前进提示 */}
                         <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 10px"}}>
                           <span style={{fontSize:11,fontWeight:700,color:"#5a7a20"}}>{q.steps||0} / {q.stepCap||20} 步</span>
                           <span style={{fontSize:11,fontWeight:800,color:"#5a7a20"}}>→ 前进 🌸</span>
@@ -2565,9 +2661,7 @@ function App(){
                         ?<button style={{...S.dBtn,background:"#FFD166",color:"#7A4A00"}} onClick={()=>stopCollect(ct.id)}>结束</button>
                         :<button style={S.dBtn} onClick={()=>startCollect(ct.id)}>开始</button>
                       }
-                      {records.length>0&&!timing&&(
-                        <button style={{...S.dBtn,fontSize:11,background:"#F0FFF0",color:"#3A7D3E"}} onClick={()=>archiveCollect(ct.id)}>📊 存档</button>
-                      )}                    </div>
+                    </div>
                   </div>
                   {timing&&(
                     <div style={{marginTop:8,fontSize:11,color:"#A06000",fontWeight:700}}>⏳ 计时中…</div>
@@ -3373,6 +3467,9 @@ function App(){
           <button style={{...S.cfmBtn,marginTop:14}} onClick={saveColTimer}>{colForm.editId?"保存修改 ✏️":"确认建立 ⏳"}</button>
           {colForm.editId&&<>
             <div style={{textAlign:"center",fontSize:11,color:"#B09070",margin:"12px 0 6px"}}>── 其他操作 ──</div>
+            {(()=>{const ct=(s.collectionTasks||[]).find(c=>c.id===colForm.editId);return ct&&(ct.records||[]).length>0&&!ct.isTiming;})()&&(
+              <button style={{...S.dBtn,width:"100%",background:"#F0FFF0",color:"#3A7D3E",marginBottom:6}} onClick={()=>{archiveCollect(colForm.editId);setColForm(null);}}>📊 存档并删除</button>
+            )}
             <button style={{...S.dBtn,width:"100%",background:"#FFF0EE",color:"#C0392B",border:"2px solid #FFB3A8"}} onClick={()=>{deleteCollect(colForm.editId);setColForm(null);}}>🗑️ 删除这个计时器</button>
           </>}
         </Drawer>
