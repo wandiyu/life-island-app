@@ -398,6 +398,11 @@ const DEF_HABITS=[
 const DEF_RESCUE=["去运动一下","弹尤克里里","冥想10分钟","出门散散步","喝杯热茶","写写画画","瑜伽","box呼吸法",
 "按摩手指","整理桌子","整理文件夹","闭上眼睛听音乐","看看周围环境","躺五分钟","手表reflect","手表呼吸训练","闭上眼睛摸周围的东西"];
 // 🧩 拼图思考工具的四个字段定义：[字段key, 展示label, 输入框placeholder]，新建/编辑/卡片展示统一从这里取
+// 🌊 深海和 🪂 云端完成时的结局选项
+const DISTANT_OUTCOMES={
+  worry:["担心没有发生","担心实现了","想开了","未雨绸缪"],
+  interest:["玩的开心","玩的幸福","玩的满足","不过如此"],
+};
 const PUZZLE_FIELDS=[
   ["goal","目标","我想达成什么"],
   ["blocker","卡点","我目前在等什么"],
@@ -1297,6 +1302,7 @@ function App(){
   const [stepCapQuest,    setStepCapQuest]     = useState(null);
   const [colForm,         setColForm]          = useState(null); // 计时器新增/编辑表单 {title,desc,xp,long,short,editId?}，null=未打开
   const [colArchivePrompt,setColArchivePrompt] = useState(null); // 计时器10次存档提醒 {id}，null=无提醒
+  const [distantOutcome,  setDistantOutcome]   = useState(null); // 远方任务结局选择 {id, title, kind}，null=未打开
   const [puzForm,         setPuzForm]           = useState(null); // 拼图新建表单 {goal,blocker,blindSpot,action}，null=未打开
   const [puzEditField,    setPuzEditField]      = useState(null); // 拼图单字段编辑 {id,field,value}，null=未打开
   const [puzExpanded,     setPuzExpanded]        = useState({}); // {puzzleId: true} 记录哪些拼图卡片当前展开了"卡点/盲区/行动"，纯UI状态不持久化
@@ -1595,6 +1601,17 @@ function App(){
   // 完成远方任务：记入岛记(tag=任务) + 奖励
   const completeDistantQuest=id=>{
     const q=(s.distantQuests||[]).find(x=>x.id===id);if(!q)return;
+    // 深海和云端需要先选结局，驿站直接完成
+    if(q.kind==="worry"||q.kind==="interest"){
+      setDistantOutcome({id,title:q.title,kind:q.kind});
+      return;
+    }
+    // 驿站直接完成
+    confirmDistantOutcome(id,null);
+  };
+  // 选完结局后（或驿站不选）执行存档
+  const confirmDistantOutcome=(id,outcome)=>{
+    const q=(s.distantQuests||[]).find(x=>x.id===id);if(!q)return;
     const r=q.reward||{};
     const{player,badges,longStats,shortStats,didLevelUp,latestBadge,lc,sc}=grantReward(r,{longOverflow:true});
     const kindLabel=q.kind==="worry"?"深海":q.kind==="interest"?"云端":"驿站";
@@ -1602,8 +1619,9 @@ function App(){
     if(!didLevelUp)pop(`${kindIcon} ${rwdTxt(r,s.longStats,s.shortStats)}`);
     else if(latestBadge)setNewBadge(latestBadge);
     const descNote=q.desc?`，${q.desc}`:"";
+    const outcomeNote=outcome?` → ${outcome}`:"";
     const ev={id:Date.now(),date:todayKey(),
-      text:`远方任务（${kindLabel}）：${q.title}${descNote}`,
+      text:`远方任务（${kindLabel}）：${q.title}${descNote}${outcomeNote}`,
       xp:r.xp||0,statChanges:{...lc,...sc},tag:"任务"};
     const existingTags=s.eventTags||[];
     const newTags=existingTags.includes("任务")?existingTags:[...existingTags,"任务"];
@@ -1612,6 +1630,7 @@ function App(){
       bigEvents:[...(s.bigEvents||[]),ev].slice(-2000),
       eventTags:newTags,
     });
+    setDistantOutcome(null);
   };
   // 删除远方任务
   const deleteDistantQuest=id=>{
@@ -2006,6 +2025,39 @@ function App(){
               </div>
               <button style={S.cfmBtn} onClick={()=>keepStaleTimer(cur.id)}>{t("这是真的，继续计时","Keep timing")}</button>
               <button style={{...S.cfmBtn,marginTop:8,background:"#FFF0EE",color:"#C0392B",boxShadow:"none",border:"2px solid #FFB3A8"}} onClick={()=>discardStaleTimer(cur.id)}>{t("丢弃这次计时","Discard")}</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 远方任务结局选择弹窗（深海/云端完成时） */}
+      {distantOutcome&&(()=>{
+        const outcomes=DISTANT_OUTCOMES[distantOutcome.kind]||[];
+        const isWorry=distantOutcome.kind==="worry";
+        const icon=isWorry?"🌊":"🪂";
+        const accentColor=isWorry?"#5B8FCC":"#7BC67E";
+        const accentBg=isWorry?"#EEF4FF":"#F0FFF0";
+        return(
+          <div style={S.modalCenter} onClick={()=>setDistantOutcome(null)}>
+            <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 20px",maxWidth:320,width:"92%",boxShadow:"0 20px 60px rgba(0,0,0,.18)",border:`2px solid ${accentColor}30`}} onClick={e=>e.stopPropagation()}>
+              <div style={{textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:28,marginBottom:4}}>{icon}</div>
+                <div style={{fontSize:11,color:"#B09070",marginBottom:2}}>{isWorry?"深海":"云端"}</div>
+                <div style={{fontSize:14,fontWeight:800,color:"#3D2B1F",lineHeight:1.4}}>「{distantOutcome.title}」</div>
+                <div style={{fontSize:11,color:"#B09070",marginTop:6}}>这件事最终……</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {outcomes.map(o=>(
+                  <button key={o}
+                    style={{background:"#fff",border:`1.5px solid #E8E0D4`,borderRadius:14,padding:"11px 16px",cursor:"pointer",textAlign:"left",fontSize:13,fontWeight:700,color:"#3D2B1F",display:"flex",alignItems:"center",gap:10,transition:"all .15s"}}
+                    onClick={()=>confirmDistantOutcome(distantOutcome.id,o)}
+                    onMouseEnter={e=>{e.currentTarget.style.background=accentBg;e.currentTarget.style.borderColor=accentColor;}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="#fff";e.currentTarget.style.borderColor="#E8E0D4";}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:accentColor,flexShrink:0}}/>
+                    {o}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         );
