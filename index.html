@@ -2658,7 +2658,10 @@ function App(){
                     </div>
                     <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0,alignItems:"flex-end"}}>
                       {timing
-                        ?<button style={{...S.dBtn,background:"#FFD166",color:"#7A4A00"}} onClick={()=>stopCollect(ct.id)}>结束</button>
+                        ?<>
+                          <button style={{...S.dBtn,background:"#FFD166",color:"#7A4A00"}} onClick={()=>stopCollect(ct.id)}>结束</button>
+                          <button style={{...S.dBtn,fontSize:11,background:"#FFF0EE",color:"#C0392B"}} onClick={()=>discardStaleTimer(ct.id)}>放弃</button>
+                        </>
                         :<button style={S.dBtn} onClick={()=>startCollect(ct.id)}>开始</button>
                       }
                     </div>
@@ -3524,7 +3527,7 @@ function App(){
       )}
 
       {/* 采集任务计时悬浮窗：全局显示，不受当前tab影响 */}
-      <CollectTimerWidget tasks={(s.collectionTasks||[]).filter(ct=>ct.isTiming&&ct.startTime)} onStop={stopCollect}/>
+      <CollectTimerWidget tasks={(s.collectionTasks||[]).filter(ct=>ct.isTiming&&ct.startTime)} onStop={stopCollect} onDiscard={discardStaleTimer}/>
     </div>
     </LangCtx.Provider>
   );
@@ -4330,7 +4333,7 @@ const genFireworkRound=()=>{
   });
 };
 // 全局悬浮：显示所有正在计时中的采集任务，支持多个堆叠，可直接点击"结束"
-function CollectTimerWidget({tasks,onStop}){
+function CollectTimerWidget({tasks,onStop,onDiscard}){
   const [now,setNow]=useState(Date.now());
   useEffect(()=>{
     const timer=setInterval(()=>setNow(Date.now()),1000);
@@ -4357,6 +4360,10 @@ function CollectTimerWidget({tasks,onStop}){
               flexShrink:0,background:"#FFD166",color:"#7A4A00",border:"none",borderRadius:14,
               padding:"8px 16px",fontSize:13,fontWeight:800,cursor:"pointer",
             }}>结束</button>
+            <button onClick={()=>onDiscard&&onDiscard(ct.id)} style={{
+              flexShrink:0,background:"rgba(255,255,255,.15)",color:"#ffaaaa",border:"none",borderRadius:14,
+              padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer",
+            }}>放弃</button>
           </div>
         );
       })}
