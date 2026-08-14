@@ -243,6 +243,11 @@ const gameDate = (d=new Date()) => {
 const todayKey = () => {
   return gameDate().toLocaleDateString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit" });
 };
+// YYYY-MM-DD 格式的游戏内今天，与 <input type="date"> 的值格式一致，供 reminderDate 比较使用
+const todayISO = () => {
+  const d = gameDate();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
 // 游戏内当前所属月份的 key，格式 "年-月"，同样遵循05:00边界规则
 const monthKeyOf = (d=new Date()) => {
   const dt = gameDate(d);
@@ -1303,6 +1308,8 @@ function App(){
   const [colForm,         setColForm]          = useState(null); // 计时器新增/编辑表单 {title,desc,xp,long,short,editId?}，null=未打开
   const [colArchivePrompt,setColArchivePrompt] = useState(null); // 计时器10次存档提醒 {id}，null=无提醒
   const [distantOutcome,  setDistantOutcome]   = useState(null); // 远方任务结局选择 {id, title, kind}，null=未打开
+  const [distantReminders,setDistantReminders] = useState([]); // 到期的远方任务提醒列表 [{id,title,kind}]
+  const [reminderAction,  setReminderAction]   = useState(null); // 提醒弹窗二级操作 {type:"reschedule"|"moveTo", id}，null=主弹窗
   const [milestoneModal,  setMilestoneModal]   = useState(null); // 里程碑弹窗 {questId}，null=未打开
   const [msInput,         setMsInput]          = useState(""); // 里程碑新增输入框
   const [msEditId,        setMsEditId]         = useState(null); // 正在编辑的里程碑id，null=不在编辑
@@ -1499,6 +1506,9 @@ function App(){
     dbSet(d);setS(d);
     // 提醒用户处理卡死超过1小时的采集任务计时
     if(staleCollectTimers.length>0) setStaleTimers(staleCollectTimers);
+    // 检查远方任务到期提醒：reminderDate <= today 的任务弹窗提醒
+    const dueReminders=(d.distantQuests||[]).filter(q=>q.reminderDate&&q.reminderDate<=todayISO());
+    if(dueReminders.length>0) setDistantReminders(dueReminders.map(q=>({id:q.id,title:q.title,kind:q.kind})));
     // 签到检测：每天05:00后首次打开时弹出（用 morningShown ref 防止 user 变化导致 initData 重跑时重复弹出）
     if(!d.checkinDates?.[today]&&h>=5&&!morningShown.current){
       morningShown.current=true;
@@ -1633,10 +1643,12 @@ function App(){
     Object.keys(reward.long).forEach(k=>{if(!reward.long[k])delete reward.long[k];});
     Object.keys(reward.short).forEach(k=>{if(!reward.short[k])delete reward.short[k];});
     if(distantForm.editId){
-      save({...s,distantQuests:(s.distantQuests||[]).map(q=>q.id===distantForm.editId?{...q,title:distantForm.title.trim(),desc:distantForm.desc||"",kind:distantForm.kind,reward}:q)});
+      const rd=distantForm.reminderDate||undefined;
+      save({...s,distantQuests:(s.distantQuests||[]).map(q=>q.id===distantForm.editId?{...q,title:distantForm.title.trim(),desc:distantForm.desc||"",kind:distantForm.kind,reward,...(rd?{reminderDate:rd}:{reminderDate:undefined})}:q)});
       setDistantForm(null);pop("✏️ 已保存");return;
     }
-    const q={id:Date.now(),title:distantForm.title.trim(),desc:distantForm.desc||"",kind:distantForm.kind,reward};
+    const rd=distantForm.reminderDate||undefined;
+    const q={id:Date.now(),title:distantForm.title.trim(),desc:distantForm.desc||"",kind:distantForm.kind,reward,...(rd?{reminderDate:rd}:{})};
     save({...s,distantQuests:[...(s.distantQuests||[]),q]});
     const kindIcon=distantForm.kind==="worry"?"🌊":distantForm.kind==="interest"?"🪂":"🏕️";
     setDistantForm(null);pop(`${kindIcon} 已放入远方`);
@@ -2132,6 +2144,75 @@ function App(){
         );
       })()}
 
+      {/* 远方任务到期提醒弹窗 */}
+      {distantReminders.length>0&&!reminderAction&&(()=>{
+        const cur=distantReminders[0];
+        const icon=cur.kind==="worry"?"🌊":cur.kind==="interest"?"🪂":"🏕️";
+        const label=cur.kind==="worry"?"深海":cur.kind==="interest"?"云端":"驿站";
+        const dismiss=()=>setDistantReminders(prev=>prev.slice(1));
+        return(
+          <div style={S.modalCenter}>
+            <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 20px",maxWidth:320,width:"92%",boxShadow:"0 20px 60px rgba(0,0,0,.2)",border:"2px solid #EDD9A3"}}>
+              <div style={{textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:28,marginBottom:4}}>{icon}</div>
+                <div style={{fontSize:11,color:"#B09070",marginBottom:4}}>{label} · 提醒到了</div>
+                <div style={{fontSize:15,fontWeight:900,color:"#3D2B1F",lineHeight:1.4}}>「{cur.title}」</div>
+                <div style={{fontSize:11,color:"#B09070",marginTop:6}}>你放在远方的这件事，现在想怎么处理？</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <button style={S.cfmBtn} onClick={()=>setReminderAction({type:"moveTo",id:cur.id,title:cur.title})}>🌴 迁入当下</button>
+                <button style={{...S.cfmBtn,background:"#EEF6FF",color:"#5588CC"}} onClick={()=>setReminderAction({type:"reschedule",id:cur.id,title:cur.title,date:""})}>⏰ 修改提醒日期</button>
+                <button style={{...S.cfmBtn,background:"#F5F5F5",color:"#7A5C44",boxShadow:"none"}} onClick={()=>{
+                  // 清除这条提醒日期（今天已提醒过，不再重复弹）
+                  save({...s,distantQuests:(s.distantQuests||[]).map(q=>q.id===cur.id?{...q,reminderDate:undefined}:q)});
+                  dismiss();
+                }}>先不管，清除提醒</button>
+              </div>
+              {distantReminders.length>1&&<div style={{textAlign:"center",fontSize:11,color:"#B09070",marginTop:12}}>还有 {distantReminders.length-1} 条提醒</div>}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 提醒弹窗二级：迁入当下选类型 */}
+      {reminderAction?.type==="moveTo"&&(
+        <div style={S.modalCenter}>
+          <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 20px",maxWidth:320,width:"92%",boxShadow:"0 20px 60px rgba(0,0,0,.2)",border:"2px solid #EDD9A3"}}>
+            <div style={{fontSize:15,fontWeight:900,color:"#3D2B1F",marginBottom:4}}>迁入当下 🌴</div>
+            <div style={{fontSize:12,color:"#B09070",marginBottom:16}}>「{reminderAction.title}」变成哪种任务？</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[["main","🌵 开荒主线"],["side","🌳 种树任务"],["recurring","💦 浇水任务"]].map(([type,label])=>(
+                <button key={type} style={S.cfmBtn} onClick={()=>{
+                  confirmMoveToCurrent(reminderAction.id,type);
+                  setReminderAction(null);
+                  setDistantReminders(prev=>prev.slice(1));
+                }}>{label}</button>
+              ))}
+              <button style={{...S.cfmBtn,background:"#F5F5F5",color:"#7A5C44",boxShadow:"none"}} onClick={()=>setReminderAction(null)}>← 返回</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 提醒弹窗二级：修改提醒日期 */}
+      {reminderAction?.type==="reschedule"&&(
+        <div style={S.modalCenter}>
+          <div style={{background:"#FFFDF5",borderRadius:24,padding:"24px 20px",maxWidth:320,width:"92%",boxShadow:"0 20px 60px rgba(0,0,0,.2)",border:"2px solid #EDD9A3"}}>
+            <div style={{fontSize:15,fontWeight:900,color:"#3D2B1F",marginBottom:12}}>修改提醒日期 ⏰</div>
+            <input type="date" style={{...S.inp,width:"100%",marginBottom:14}} min={todayISO()}
+              value={reminderAction.date} onChange={e=>setReminderAction(p=>({...p,date:e.target.value}))}/>
+            <button style={{...S.cfmBtn,marginBottom:8}} onClick={()=>{
+              if(!reminderAction.date)return;
+              save({...s,distantQuests:(s.distantQuests||[]).map(q=>q.id===reminderAction.id?{...q,reminderDate:reminderAction.date}:q)});
+              setReminderAction(null);
+              setDistantReminders(prev=>prev.slice(1));
+              pop("⏰ 提醒日期已更新");
+            }}>确认</button>
+            <button style={{...S.cfmBtn,background:"#F5F5F5",color:"#7A5C44",boxShadow:"none"}} onClick={()=>setReminderAction(null)}>← 返回</button>
+          </div>
+        </div>
+      )}
+
       {/* 远方任务结局选择弹窗（深海/云端完成时） */}
       {distantOutcome&&(()=>{
         const outcomes=DISTANT_OUTCOMES[distantOutcome.kind]||[];
@@ -2443,12 +2524,12 @@ function App(){
             const emptyMsg=kind==="worry"?"沉到深海里，暂时不用理它🌊":kind==="interest"?"飘在云端的好奇，等风来🪂":"暂时不想做的任务放这里歇歇脚🏕️";
             return(
               <div key={kind} id={domId} style={{marginBottom:12}}>
-              <ACCard title={label} action={<button style={S.plusBtn} onClick={()=>setDistantForm({title:"",desc:"",kind,xp:5,long:{},short:{}})}>＋ 新增</button>}>
+              <ACCard title={label} action={<button style={S.plusBtn} onClick={()=>setDistantForm({title:"",desc:"",kind,xp:5,long:{},short:{},reminderDate:""})}>＋ 新增</button>}>
                 {list.length===0&&<div style={S.empty}>{emptyMsg}</div>}
                 {list.map(q=>(
                   <div key={q.id} style={{padding:"12px 0",borderBottom:"1.5px dashed #EDD9A3"}}>
                     <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                      <div style={{flex:1,cursor:"pointer"}} onClick={()=>setDistantForm({editId:q.id,title:q.title,desc:q.desc||"",kind:q.kind,xp:q.reward?.xp||5,long:q.reward?.long||{},short:q.reward?.short||{}})}>
+                      <div style={{flex:1,cursor:"pointer"}} onClick={()=>setDistantForm({editId:q.id,title:q.title,desc:q.desc||"",kind:q.kind,xp:q.reward?.xp||5,long:q.reward?.long||{},short:q.reward?.short||{},reminderDate:q.reminderDate||""})}>
                         <div style={{fontSize:14,fontWeight:800,marginBottom:3,color:"#3D2B1F"}}>{kindIcon} {q.title}</div>
                         {q.desc&&<div style={{fontSize:11,color:"#B09070",marginBottom:3}}>{q.desc}</div>}
                         <div style={{fontSize:11,color:"#7BC67E",fontWeight:700}}>{rwdTxt(q.reward,s.longStats,s.shortStats)}</div>
@@ -3414,7 +3495,11 @@ function App(){
           <BonusRow stats={s.longStats} bonus={distantForm.long} onChange={b=>setDistantForm(p=>({...p,long:b}))}/>
           <FL>今日属性加成</FL>
           <BonusRow stats={s.shortStats} bonus={distantForm.short} onChange={b=>setDistantForm(p=>({...p,short:b}))}/>
-          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveDistantQuest}>{distantForm.editId?"保存修改 ✏️":"放入远方 🌅"}</button>
+          <FL>⏰ 提醒日期（可选）</FL>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <input type="date" style={{...S.inp,flex:1}} min={todayISO()} value={distantForm.reminderDate||""} onChange={e=>setDistantForm(p=>({...p,reminderDate:e.target.value}))}/>
+            {distantForm.reminderDate&&<button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"#B09070",flexShrink:0}} onClick={()=>setDistantForm(p=>({...p,reminderDate:""}))}>✕ 清除</button>}
+          </div>          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveDistantQuest}>{distantForm.editId?"保存修改 ✏️":"放入远方 🌅"}</button>
           {distantForm.editId&&<>
             <div style={{textAlign:"center",fontSize:11,color:"#B09070",margin:"12px 0 6px"}}>── 迁移 ──</div>
             <button style={{...S.dBtn,width:"100%",background:"#F0FFF0",color:"#3A7D3E"}} onClick={()=>{setDistantForm(null);setMoveToCurrent({id:distantForm.editId,title:distantForm.title});}}>🌴 迁入当下</button>
