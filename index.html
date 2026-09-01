@@ -3970,6 +3970,12 @@ function ColorCalendar({history,dayColors,daySummaries,bigEvents,checkedHabits,c
   const historyDates=new Set([...(history||[]).map(h=>h.date), today]);
   Object.keys(dayColors||{}).forEach(d=>{if(d&&!historyDates.has(d))dayMap.set(d,{date:d});});
   Object.keys(daySummaries||{}).forEach(d=>{if(d&&!historyDates.has(d))dayMap.set(d,{date:d});});
+  // 补入最近30天的空格子，确保没有登录记录的日期也能显示（可以补录彩虹收藏）
+  for(let i=0;i<30;i++){
+    const dt=gameDate();dt.setDate(dt.getDate()-i);
+    const dk=dt.toLocaleDateString("zh-CN",{year:"numeric",month:"2-digit",day:"2-digit"});
+    if(!dayMap.has(dk))dayMap.set(dk,{date:dk});
+  }
   // highest priority: today
   dayMap.set(today,{date:today,...todaySnap,isToday:true});
   const allDays=[...dayMap.values()].sort((a,b)=>a.date<b.date?1:-1);
