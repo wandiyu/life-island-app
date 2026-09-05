@@ -143,6 +143,7 @@
     #root { min-height:100vh; }
 
     @keyframes badgePop   { 0%{transform:scale(0) rotate(-15deg);opacity:0} 70%{transform:scale(1.2) rotate(3deg)} 100%{transform:scale(1) rotate(0);opacity:1} }
+    @keyframes fuzzyPop   { 0%{transform:scale(1)} 20%{transform:scale(0.88) rotate(-2deg)} 50%{transform:scale(1.18) rotate(1.5deg)} 70%{transform:scale(0.97) rotate(-1deg)} 85%{transform:scale(1.05)} 100%{transform:scale(1) rotate(0)} }
     @keyframes float      { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
     @keyframes leafSway   { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
     @keyframes fadeSlideUp{ 0%{opacity:0;transform:translateY(16px)} 100%{opacity:1;transform:translateY(0)} }
@@ -408,6 +409,9 @@ const DISTANT_OUTCOMES={
   worry:["担心没有发生","担心实现了","想开了","未雨绸缪"],
   interest:["玩的开心","玩的幸福","玩的满足","不过如此"],
 };
+// 🪺 幼崽保护中心：统一爪爪形状，颜色循环分配
+const CV_COLORS=["#F5C8D4","#F5E8A8","#C8DFF5","#C8EDD4","#E8D0F5","#F5D8C0"];
+const CV_DEFAULT_COLOR="#F5C8D4";
 const PUZZLE_FIELDS=[
   ["goal","目标","我想达成什么"],
   ["blocker","卡点","我目前在等什么"],
@@ -622,6 +626,7 @@ const INIT={
   monthlyChallenge: {}, // monthKey("2026-6") → {title, target, count, achieved, checkedDates:[dateKey]} 每月只能设置一次目标，设置后title/target锁定不可改
   puzzleTools: [], // {id, goal, blocker, blindSpot, action, status:"active"} 拼图思考工具，存档后会从此数组移除并写入岛上新闻
   distantQuests: [], // {id, title, desc, kind:"worry"|"interest", reward} 「远方」任务，可迁入「当下」或直接完成
+  coreValues: [], // {id, label, emoji, count} 幼崽保护中心——核心特质列表，每次践行可点+1
 };
 
 const clamp  = v=>Math.max(0,Math.min(100,Math.round(Number(v)||0)));
@@ -1311,6 +1316,8 @@ function App(){
   const [distantReminders,setDistantReminders] = useState([]); // 到期的远方任务提醒列表 [{id,title,kind}]
   const [reminderAction,  setReminderAction]   = useState(null); // 提醒弹窗二级操作 {type:"reschedule"|"moveTo", id}，null=主弹窗
   const [milestoneModal,  setMilestoneModal]   = useState(null); // 里程碑弹窗 {questId}，null=未打开
+  const [cvForm,          setCvForm]           = useState(null); // 核心特质新增/编辑表单 {label, editId?}，null=未打开
+  const [fuzzyAnim,       setFuzzyAnim]        = useState({}); // {valueId: true} 正在播放毛茸茸动画的特质
   const [msInput,         setMsInput]          = useState(""); // 里程碑新增输入框
   const [msEditId,        setMsEditId]         = useState(null); // 正在编辑的里程碑id，null=不在编辑
   const [puzForm,         setPuzForm]           = useState(null); // 拼图新建表单 {goal,blocker,blindSpot,action}，null=未打开
@@ -1392,6 +1399,7 @@ function App(){
     if(!d.monthlyChallenge)           d.monthlyChallenge={};
     if(!d.puzzleTools)                d.puzzleTools=[];
     if(!d.distantQuests)              d.distantQuests=[];
+    if(!d.coreValues)                 d.coreValues=[];
     // 确保「任务」「计时器」标签存在于eventTags中
     if(!(d.eventTags||[]).includes("任务"))d.eventTags=[...(d.eventTags||[]),"任务"];
     if(!(d.eventTags||[]).includes("计时器"))d.eventTags=[...(d.eventTags||[]),"计时器"];
@@ -1933,6 +1941,34 @@ function App(){
   };
   // ─── 🧩 拼图思考工具 ───
   // 新建：四个字段必填才能保存
+  // ─── 🪺 幼崽保护中心 ───
+  const saveCoreValue=()=>{
+    if(!cvForm.label.trim())return;
+    if(cvForm.editId){
+      save({...s,coreValues:(s.coreValues||[]).map(v=>v.id===cvForm.editId?{...v,label:cvForm.label.trim()}:v)});
+      setCvForm(null);pop("✏️ 已保存");return;
+    }
+    const nv={id:"cv_"+Date.now(),label:cvForm.label.trim(),count:0};
+    save({...s,coreValues:[...(s.coreValues||[]),nv]});
+    setCvForm(null);pop(`🪺 已添加「${nv.label}」`);
+  };
+  const incrementCoreValue=id=>{
+    // 毛茸茸动画
+    setFuzzyAnim(p=>({...p,[id]:true}));
+    setTimeout(()=>setFuzzyAnim(p=>{const n={...p};delete n[id];return n;}),500);
+    // +1计数 + +1🌸
+    const{player,badges,longStats,shortStats,didLevelUp,latestBadge}=grantReward({xp:1},{longOverflow:true});
+    save({...s,
+      coreValues:(s.coreValues||[]).map(v=>v.id===id?{...v,count:v.count+1}:v),
+      player,badges,longStats,shortStats,
+    });
+    if(didLevelUp){setNewBadge(latestBadge);}
+    else pop("🪺 +1 🌸");
+  };
+  const deleteCoreValue=id=>{
+    save({...s,coreValues:(s.coreValues||[]).filter(v=>v.id!==id)});
+    setCvForm(null);pop("🗑️ 已删除");
+  };
   const savePuzzle=()=>{
     const{goal,blocker,blindSpot,action}=puzForm;
     if(!goal.trim()||!blocker.trim()||!blindSpot.trim()||!action.trim())return;
@@ -2348,7 +2384,7 @@ function App(){
         {tab==="home"&&<>
           {/* 快速电梯 */}
           <div style={{display:"flex",gap:2,position:"sticky",top:51,zIndex:8,background:"#FFFDF5",padding:"2px 14px",margin:"-14px -14px 12px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-            {[["h-long","🍊"],["h-motto","🔮"]].map(([id,label])=>(
+            {[["h-long","🍊"],["h-motto","🔮"],["h-nest","🪺"]].map(([id,label])=>(
               <button key={id} onClick={()=>{
                   const el=document.getElementById(id);
                   if(!el)return;
@@ -2421,6 +2457,46 @@ function App(){
               </div>
               :<div style={{fontSize:15,color:"#3D2B1F",lineHeight:1.75,fontWeight:700,background:"#F8FFF8",borderRadius:14,padding:"12px 16px",border:"2px dashed #C8E8C8",fontStyle:"italic"}}>{s.motto||t("点击「编辑」添加岛主座右铭 🔮","Click Edit to add your motto 🌿")}</div>
             }
+          </ACCard>
+          </div>
+
+          {/* 🪺 幼崽保护中心 */}
+          <div id="h-nest">
+          <ACCard title="🪺 幼崽保护中心" action={<button style={S.plusBtn} onClick={()=>setCvForm({label:""})}>＋ 新增</button>}>
+            {(s.coreValues||[]).length===0&&<div style={S.empty}>写下你的核心特质，每次做到就点一下 🪺</div>}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+              {(s.coreValues||[]).map((v,i)=>{
+                const fill=CV_COLORS[i%CV_COLORS.length];
+                return(
+                  <div key={v.id} style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                    <div style={{position:"relative",width:"100%",paddingBottom:"100%"}}>
+                      <button onClick={()=>incrementCoreValue(v.id)}
+                        style={{position:"absolute",inset:0,background:"none",border:"none",cursor:"pointer",
+                          animation:fuzzyAnim[v.id]?"fuzzyPop .5s cubic-bezier(.34,1.56,.64,1) forwards":undefined,
+                          WebkitTapHighlightColor:"transparent"}}>
+                        <svg viewBox="0 0 100 100" width="100%" height="100%">
+                          {/* 掌心：宽在下窄在上 */}
+                          <path d="M50 48 C38 48 24 54 20 66 C16 78 20 86 28 88 C34 90 40 90 50 90 C60 90 66 90 72 88 C80 86 84 78 80 66 C76 54 62 48 50 48Z" fill={fill}/>
+                          {/* 4个椭圆肉垫等距排列 */}
+                          <ellipse cx="22" cy="42" rx="9" ry="11" fill={fill}/>
+                          <ellipse cx="38" cy="31" rx="9" ry="11" fill={fill}/>
+                          <ellipse cx="62" cy="31" rx="9" ry="11" fill={fill}/>
+                          <ellipse cx="78" cy="42" rx="9" ry="11" fill={fill}/>
+                        </svg>
+                        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",paddingTop:"40%"}}>
+                          <span style={{fontSize:10,fontWeight:900,color:"#3D2B1F",lineHeight:1.3,textAlign:"center",wordBreak:"break-all",maxWidth:"50%"}}>{v.label}</span>
+                        </div>
+                      </button>
+                    </div>
+                    <span style={{fontSize:10,color:"#B09070",fontWeight:600}}>{v.count} 次</span>
+                    <button onClick={e=>{e.stopPropagation();setCvForm({editId:v.id,label:v.label});}}
+                      style={{position:"absolute",top:2,right:2,width:16,height:16,borderRadius:"50%",background:"rgba(255,255,255,.7)",border:"none",cursor:"pointer",fontSize:8,color:"rgba(0,0,0,.35)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1}}>
+                      ✏
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </ACCard>
           </div>
         </>}
@@ -3559,6 +3635,25 @@ function App(){
               <button style={{...S.dBtn,width:"100%",background:"#F0FFF0",color:"#3A7D3E",marginBottom:6}} onClick={()=>{archiveCollect(colForm.editId);setColForm(null);}}>📊 存档并删除</button>
             )}
             <button style={{...S.dBtn,width:"100%",background:"#FFF0EE",color:"#C0392B",border:"2px solid #FFB3A8"}} onClick={()=>{deleteCollect(colForm.editId);setColForm(null);}}>🗑️ 删除这个计时器</button>
+          </>}
+        </Drawer>
+      )}
+
+      {/* 🪺 幼崽保护中心：新增/编辑特质 */}
+      {cvForm&&(
+        <Drawer onClose={()=>setCvForm(null)}>
+          <div style={S.dH}>{cvForm.editId?"编辑特质 ✏️":"新增特质 🪺"}</div>
+          <FL>特质名称</FL>
+          <input style={S.inp} placeholder="例：诚实、勇气、用心陪伴…"
+            value={cvForm.label} onChange={e=>setCvForm(p=>({...p,label:e.target.value}))}
+            autoFocus/>
+          <button style={{...S.cfmBtn,marginTop:14}} onClick={saveCoreValue}>
+            {cvForm.editId?"保存修改 ✏️":"确认添加 🪺"}
+          </button>
+          {cvForm.editId&&<>
+            <div style={{textAlign:"center",fontSize:11,color:"#B09070",margin:"12px 0 6px"}}>── 其他操作 ──</div>
+            <button style={{...S.dBtn,width:"100%",background:"#FFF0EE",color:"#C0392B",border:"2px solid #FFB3A8"}}
+              onClick={()=>deleteCoreValue(cvForm.editId)}>🗑️ 删除这条特质</button>
           </>}
         </Drawer>
       )}
